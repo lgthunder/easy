@@ -65,12 +65,19 @@ class FloatingWindowManager(
         player.setMediaItem(MediaItem.fromUri(file.toURI().toString()))
         player.prepare()
         player.playWhenReady = true
+        player.volume = 0f
+        playerView.setControllerVisibilityListener(object :PlayerView.ControllerVisibilityListener{
+            override fun onVisibilityChanged(visibility: Int) {
+                window.setTitleBarVisible(visibility)
+            }
+
+        })
 
         window.setContent(playerView)
 
         window.showMuteButton(true)
-        window.setMuted(false)
-        window.setVolume(50)
+        window.setMuted(true)
+        window.setVolume(0)
         window.setOnMuteClickListener {
             val muted = player.volume > 0f
             player.volume = if (muted) 0f else (window.getVolumeProgress() / 100f)

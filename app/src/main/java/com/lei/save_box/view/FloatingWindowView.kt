@@ -1,6 +1,8 @@
 package com.lei.save_box.view
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.util.AttributeSet
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -41,6 +43,11 @@ class FloatingWindowView @JvmOverloads constructor(
 
     var fullScreenW = 0
     var fullScreenH =0
+
+    private val handler = Handler(Looper.getMainLooper())
+    private val volumeHideRunnable = Runnable {
+        binding.volumeBar.visibility = View.GONE
+    }
 
     companion object {
         private const val RESIZE_NONE = 0
@@ -219,6 +226,7 @@ class FloatingWindowView @JvmOverloads constructor(
         if (binding.titleBar.visibility == View.VISIBLE) {
             binding.titleBar.visibility = View.GONE
             binding.volumeBar.visibility = View.GONE
+            handler.removeCallbacks(volumeHideRunnable)
         } else {
             binding.titleBar.visibility = View.VISIBLE
         }
@@ -250,11 +258,29 @@ class FloatingWindowView @JvmOverloads constructor(
     }
 
     fun toggleVolumeBar() {
-        binding.volumeBar.visibility = if (binding.volumeBar.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+        if (binding.volumeBar.visibility == View.VISIBLE) {
+            binding.volumeBar.visibility = View.GONE
+            handler.removeCallbacks(volumeHideRunnable)
+        } else {
+            binding.volumeBar.visibility = View.VISIBLE
+            startVolumeAutoHide()
+        }
     }
 
     fun hideVolumeBar() {
         binding.volumeBar.visibility = View.GONE
+        handler.removeCallbacks(volumeHideRunnable)
+    }
+
+    private fun startVolumeAutoHide() {
+        handler.removeCallbacks(volumeHideRunnable)
+        handler.postDelayed(volumeHideRunnable, 3000)
+    }
+
+    private fun resetVolumeAutoHide() {
+        if (binding.volumeBar.visibility == View.VISIBLE) {
+            startVolumeAutoHide()
+        }
     }
 
     fun setVolume(volume: Int) {
@@ -270,8 +296,12 @@ class FloatingWindowView @JvmOverloads constructor(
             override fun onProgressChanged(seekBar: android.widget.SeekBar, progress: Int, fromUser: Boolean) {
                 if (fromUser) listener(progress)
             }
-            override fun onStartTrackingTouch(seekBar: android.widget.SeekBar) {}
-            override fun onStopTrackingTouch(seekBar: android.widget.SeekBar) {}
+            override fun onStartTrackingTouch(seekBar: android.widget.SeekBar) {
+                handler.removeCallbacks(volumeHideRunnable)
+            }
+            override fun onStopTrackingTouch(seekBar: android.widget.SeekBar) {
+                startVolumeAutoHide()
+            }
         })
     }
 
@@ -284,10 +314,15 @@ class FloatingWindowView @JvmOverloads constructor(
     }
 
     fun removeFromParent() {
+        handler.removeCallbacks(volumeHideRunnable)
         (parent as? ViewGroup)?.removeView(this)
     }
 
     private fun dpToPx(dp: Int): Int {
         return (dp * context.resources.displayMetrics.density).toInt()
+    }
+
+    fun setTitleBarVisible(visibility: Int) {
+        binding.titleBar.visibility = visibility
     }
 }
