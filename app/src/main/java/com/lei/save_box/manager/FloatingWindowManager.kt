@@ -1,6 +1,7 @@
 package com.lei.save_box.manager
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageView
@@ -18,6 +19,7 @@ class FloatingWindowManager(
 ) {
     private val windows = mutableListOf<FloatingWindowView>()
     private val players = mutableListOf<ExoPlayer>()
+    private val prefs: SharedPreferences = context.getSharedPreferences("floating_window", Context.MODE_PRIVATE)
 
     fun openImage(filePath: String) {
         val file = File(filePath)
@@ -123,21 +125,54 @@ class FloatingWindowManager(
     }
 
     private fun closeWindow(window: FloatingWindowView) {
+        saveWindowState(window)
         windows.remove(window)
         window.removeFromParent()
     }
 
     private fun addWindow(window: FloatingWindowView) {
+        val savedW = prefs.getInt(KEY_WINDOW_WIDTH, 0)
+        val savedH = prefs.getInt(KEY_WINDOW_HEIGHT, 0)
+        val savedX = prefs.getFloat(KEY_WINDOW_X, -1f)
+        val savedY = prefs.getFloat(KEY_WINDOW_Y, -1f)
+
         val lp = FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.WRAP_CONTENT,
             FrameLayout.LayoutParams.WRAP_CONTENT
         )
         container.addView(window, lp)
         windows.add(window)
+
+        if (savedW > 0 && savedH > 0) {
+            window.post {
+                window.layoutParams = FrameLayout.LayoutParams(savedW, savedH)
+                if (savedX >= 0f && savedY >= 0f) {
+                    window.x = savedX
+                    window.y = savedY
+                }
+            }
+        }
+
         bringWindowToFront(window)
+    }
+
+    private fun saveWindowState(window: FloatingWindowView) {
+        prefs.edit()
+            .putFloat(KEY_WINDOW_X, window.x)
+            .putFloat(KEY_WINDOW_Y, window.y)
+            .putInt(KEY_WINDOW_WIDTH, window.width)
+            .putInt(KEY_WINDOW_HEIGHT, window.height)
+            .apply()
     }
 
     private fun bringWindowToFront(window: FloatingWindowView) {
         window.bringToFront()
+    }
+
+    companion object {
+        private const val KEY_WINDOW_X = "window_x"
+        private const val KEY_WINDOW_Y = "window_y"
+        private const val KEY_WINDOW_WIDTH = "window_width"
+        private const val KEY_WINDOW_HEIGHT = "window_height"
     }
 }

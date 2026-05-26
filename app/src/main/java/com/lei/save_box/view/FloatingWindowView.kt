@@ -28,8 +28,8 @@ class FloatingWindowView @JvmOverloads constructor(
     private var savedWidth = 0
     private var savedHeight = 0
 
-    private val minWidth = dpToPx(200)
-    private val minHeight = dpToPx(200)
+    private val minWidth = dpToPx(190)
+    private val minHeight = dpToPx(100)
     private val edgeThreshold = dpToPx(28)
 
     private var dragDx = 0f

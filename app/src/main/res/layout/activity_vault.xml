@@ -19,11 +19,6 @@
         android:layout_height="match_parent"
         android:visibility="gone" />
 
-    <FrameLayout
-        android:id="@+id/floatingContainer"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:clipChildren="false" />
 
     <com.google.android.material.chip.Chip
         android:id="@+id/chipSelectionCount"
@@ -68,5 +63,11 @@
         android:contentDescription="@string/import_file"
         android:src="@android:drawable/ic_menu_add"
         app:tint="@android:color/white" />
+
+    <FrameLayout
+        android:id="@+id/floatingContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipChildren="false" />
 
 </FrameLayout>
