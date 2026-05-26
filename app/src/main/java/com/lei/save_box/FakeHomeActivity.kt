@@ -3,6 +3,8 @@ package com.lei.save_box
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.biometric.BiometricPrompt
@@ -87,18 +89,25 @@ class FakeHomeActivity : AppCompatActivity() {
         val fileManager = FileManager(this)
         val helper = ProgressDialogHelper(this)
         val total = uris.size
+        val mainHandler = Handler(Looper.getMainLooper())
 
         lifecycleScope.launch(Dispatchers.IO) {
             withContext(Dispatchers.Main) {
-                helper.show(getString(R.string.processing_share), total)
+                helper.show(getString(R.string.processing_share), 100)
             }
             var successCount = 0
-            for ((index, uri) in uris.withIndex()) {
-                if (fileManager.copyToVault(uri)) {
-                    successCount++
-                }
+            for (uri in uris) {
                 withContext(Dispatchers.Main) {
-                    helper.updateProgress(index + 1, "$successCount / $total")
+                    helper.updateProgress(0, "$successCount / $total")
+                }
+                val ok = fileManager.copyToVault(uri) { progress ->
+                    mainHandler.post {
+                        helper.updateProgress(progress, "$successCount / $total")
+                    }
+                }
+                if (ok) successCount++
+                withContext(Dispatchers.Main) {
+                    helper.updateProgress(100, "$successCount / $total")
                 }
             }
             withContext(Dispatchers.Main) {

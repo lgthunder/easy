@@ -45,7 +45,7 @@ class FileManager(private val context: Context) {
         }
     }
 
-    fun copyToVault(uri: Uri, originalFileName: String? = null): Boolean {
+    fun copyToVault(uri: Uri, originalFileName: String? = null, onProgress: ((Int) -> Unit)? = null): Boolean {
         ensureNomedia()
         return try {
             var fileName = originalFileName ?: getFileNameFromUri(uri) ?: "file_${System.currentTimeMillis()}"
@@ -60,12 +60,24 @@ class FileManager(private val context: Context) {
                 counter++
             }
 
+            val totalSize = getFileSizeFromUri(uri)
+            var bytesCopied = 0L
+
             context.contentResolver.openInputStream(uri)?.use { input ->
                 FileOutputStream(destFile).use { output ->
-                    input.copyTo(output)
+                    val buffer = ByteArray(8192)
+                    var bytesRead: Int
+                    while (input.read(buffer).also { bytesRead = it } != -1) {
+                        output.write(buffer, 0, bytesRead)
+                        bytesCopied += bytesRead
+                        if (totalSize > 0) {
+                            onProgress?.invoke(((bytesCopied * 100) / totalSize).toInt())
+                        }
+                    }
                 }
             }
 
+            onProgress?.invoke(100)
             destFile.exists() && destFile.length() > 0
         } catch (e: Exception) {
             e.printStackTrace()
@@ -130,5 +142,16 @@ class FileManager(private val context: Context) {
             }
         }
         return name
+    }
+
+    private fun getFileSizeFromUri(uri: Uri): Long {
+        var size = 0L
+        context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+            val sizeIndex = cursor.getColumnIndex(android.provider.OpenableColumns.SIZE)
+            if (cursor.moveToFirst() && sizeIndex >= 0) {
+                size = cursor.getLong(sizeIndex)
+            }
+        }
+        return size
     }
 }
