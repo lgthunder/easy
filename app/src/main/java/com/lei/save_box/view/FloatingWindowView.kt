@@ -17,67 +17,181 @@ class FloatingWindowView @JvmOverloads constructor(
 ) : FrameLayout(context, attrs, defStyleAttr) {
 
     private val binding: ViewFloatingWindowBinding
-    private var dX = 0f
-    private var dY = 0f
-    private var resizeDx = 0f
-    private var resizeDy = 0f
     private var onCloseListener: (() -> Unit)? = null
     private var onFocusListener: (() -> Unit)? = null
 
+    private var isFullscreen = false
+    private var savedX = 0f
+    private var savedY = 0f
+    private var savedWidth = 0
+    private var savedHeight = 0
+
     private val minWidth = dpToPx(200)
     private val minHeight = dpToPx(200)
+    private val edgeThreshold = dpToPx(28)
+
+    private var dragDx = 0f
+    private var dragDy = 0f
+
+    private var resizeMode = RESIZE_NONE
+    private var resizeStartX = 0f
+    private var resizeStartY = 0f
+    private var resizeOrigW = 0
+    private var resizeOrigH = 0
+
+    var fullScreenW = 0
+    var fullScreenH =0
+
+    companion object {
+        private const val RESIZE_NONE = 0
+        private const val RESIZE_WIDTH = 1
+        private const val RESIZE_HEIGHT = 2
+    }
 
     init {
         binding = ViewFloatingWindowBinding.inflate(LayoutInflater.from(context), this, true)
 
-        binding.titleBar.setOnTouchListener { _, event ->
-            when (event.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    dX = event.rawX - x
-                    dY = event.rawY - y
-                    bringToFront()
-                    onFocusListener?.invoke()
-                    true
-                }
-                MotionEvent.ACTION_MOVE -> {
-                    x = event.rawX - dX
-                    y = event.rawY - dY
-                    true
-                }
-                else -> false
+        binding.titleBar.setOnTouchListener { _, event -> handleTitleDrag(event) }
+        binding.btnClose.setOnClickListener { onCloseListener?.invoke() }
+        binding.btnFullscreen.setOnClickListener { toggleFullscreen() }
+
+    }
+
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        fullScreenW = (parent as View).width
+        fullScreenH = (parent as View).height
+        layoutParams = FrameLayout.LayoutParams(fullScreenW/4,fullScreenH/4)
+    }
+
+
+
+    override fun onInterceptTouchEvent(event: MotionEvent): Boolean {
+        if (isFullscreen) return false
+
+        val ex = event.x
+        val ey = event.y
+        val titleBarH = binding.titleBar.height.toFloat()
+
+        val inRightEdge = ex >= (width - edgeThreshold) && ey > titleBarH
+        val inBottomEdge = ey >= (height - edgeThreshold) && ex < (width - edgeThreshold) && ey > titleBarH
+
+        if (inRightEdge) {
+            resizeMode = RESIZE_WIDTH
+            resizeStartX = event.rawX
+            resizeOrigW = width
+            return true
+        }
+        if (inBottomEdge) {
+            resizeMode = RESIZE_HEIGHT
+            resizeStartY = event.rawY
+            resizeOrigH = height
+            return true
+        }
+        return false
+    }
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (isFullscreen) return false
+
+        when (resizeMode) {
+            RESIZE_WIDTH -> return handleWidthResize(event)
+            RESIZE_HEIGHT -> return handleHeightResize(event)
+        }
+        return super.onTouchEvent(event)
+    }
+
+    private fun handleTitleDrag(event: MotionEvent): Boolean {
+        if (isFullscreen) return false
+        return when (event.action) {
+            MotionEvent.ACTION_DOWN -> {
+                dragDx = event.rawX - x
+                dragDy = event.rawY - y
+                bringToFront()
+                onFocusListener?.invoke()
+                true
             }
-        }
-
-        binding.resizeHandle.setOnTouchListener { _, event ->
-            when (event.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    resizeDx = event.rawX
-                    resizeDy = event.rawY
-                    true
-                }
-                MotionEvent.ACTION_MOVE -> {
-                    val newW = (width + event.rawX - resizeDx).toInt().coerceAtLeast(minWidth)
-                    val newH = (height + event.rawY - resizeDy).toInt().coerceAtLeast(minHeight)
-                    layoutParams = (layoutParams ?: LayoutParams(minWidth, minHeight)).apply {
-                        width = newW
-                        height = newH
-                    }
-                    resizeDx = event.rawX
-                    resizeDy = event.rawY
-                    true
-                }
-                else -> false
+            MotionEvent.ACTION_MOVE -> {
+                x = event.rawX - dragDx
+                y = event.rawY - dragDy
+                true
             }
+            else -> false
         }
+    }
 
-        binding.btnClose.setOnClickListener {
-            onCloseListener?.invoke()
+    private fun handleWidthResize(event: MotionEvent): Boolean {
+        return when (event.action) {
+            MotionEvent.ACTION_MOVE -> {
+                val newW = (resizeOrigW + (event.rawX - resizeStartX).toInt()).coerceAtLeast(minWidth)
+                val currentLp = layoutParams as? FrameLayout.LayoutParams
+                layoutParams = FrameLayout.LayoutParams(newW, height).apply {
+                    marginStart = currentLp?.marginStart ?: 0
+                    marginEnd = currentLp?.marginEnd ?: 0
+                    topMargin = currentLp?.topMargin ?: 0
+                    bottomMargin = currentLp?.bottomMargin ?: 0
+                }
+                true
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                resizeMode = RESIZE_NONE
+                true
+            }
+            else -> false
         }
+    }
 
-        setOnClickListener {
-            bringToFront()
-            onFocusListener?.invoke()
+    private fun handleHeightResize(event: MotionEvent): Boolean {
+        return when (event.action) {
+            MotionEvent.ACTION_MOVE -> {
+                val newH = (resizeOrigH + (event.rawY - resizeStartY).toInt()).coerceAtLeast(minHeight)
+                val currentLp = layoutParams as? FrameLayout.LayoutParams
+                layoutParams = FrameLayout.LayoutParams(width, newH).apply {
+                    marginStart = currentLp?.marginStart ?: 0
+                    marginEnd = currentLp?.marginEnd ?: 0
+                    topMargin = currentLp?.topMargin ?: 0
+                    bottomMargin = currentLp?.bottomMargin ?: 0
+                }
+                true
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                resizeMode = RESIZE_NONE
+                true
+            }
+            else -> false
         }
+    }
+
+    private fun toggleFullscreen() {
+        if (isFullscreen) exitFullscreen() else enterFullscreen()
+    }
+
+    private fun enterFullscreen() {
+        savedX = x
+        savedY = y
+        savedWidth = width
+        savedHeight = height
+
+        layoutParams.height = fullScreenH
+        layoutParams.width = fullScreenW
+        x = 0f
+        y = 0f
+        requestLayout()
+
+        binding.btnFullscreen.setImageResource(android.R.drawable.ic_menu_revert)
+        binding.btnFullscreen.contentDescription = context.getString(R.string.exit_fullscreen)
+        isFullscreen = true
+    }
+
+    private fun exitFullscreen() {
+        layoutParams = FrameLayout.LayoutParams(savedWidth, savedHeight)
+        x = savedX
+        y = savedY
+
+        binding.btnFullscreen.setImageResource(android.R.drawable.ic_menu_crop)
+        binding.btnFullscreen.contentDescription = context.getString(R.string.fullscreen)
+        isFullscreen = false
     }
 
     fun setTitle(title: String) {
@@ -90,6 +204,17 @@ class FloatingWindowView @JvmOverloads constructor(
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.MATCH_PARENT
         ))
+        binding.contentContainer.setOnClickListener {
+            toggleOverlay()
+        }
+    }
+
+    private fun toggleOverlay() {
+        if (binding.titleBar.visibility == View.VISIBLE) {
+            binding.titleBar.visibility = View.GONE
+        } else {
+            binding.titleBar.visibility = View.VISIBLE
+        }
     }
 
     fun setOnCloseListener(listener: () -> Unit) {
