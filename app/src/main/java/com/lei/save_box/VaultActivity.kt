@@ -31,6 +31,7 @@ class VaultActivity : AppCompatActivity() {
     private lateinit var floatingWindowManager: FloatingWindowManager
     private lateinit var adapter: FileAdapter
     private var currentSortMode = SortMode.DATE_DESC
+    private var pauseTimestamp = 0L
 
     private val imagePickerLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -57,6 +58,7 @@ class VaultActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
         binding = ActivityVaultBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
@@ -287,5 +289,27 @@ class VaultActivity : AppCompatActivity() {
         if (hasFocus) {
             enterFullScreen()
         }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        pauseTimestamp = System.currentTimeMillis()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (pauseTimestamp > 0 && System.currentTimeMillis() - pauseTimestamp > 30_000) {
+            floatingWindowManager.closeAll()
+            finishAffinity()
+            val intent = Intent(this, FakeHomeActivity::class.java)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            startActivity(intent)
+        }
+        pauseTimestamp=-1
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        floatingWindowManager.closeAll()
     }
 }

@@ -17,6 +17,7 @@ class FloatingWindowManager(
     private val container: FrameLayout
 ) {
     private val windows = mutableListOf<FloatingWindowView>()
+    private val players = mutableListOf<ExoPlayer>()
 
     fun openImage(filePath: String) {
         val file = File(filePath)
@@ -56,6 +57,7 @@ class FloatingWindowManager(
         window.setTitle(file.name)
 
         val player = ExoPlayer.Builder(context).build()
+        players.add(player)
         val playerView = PlayerView(context).apply {
             this.player = player
             useController = true
@@ -96,7 +98,8 @@ class FloatingWindowManager(
         }
 
         window.setOnCloseListener {
-            player.release()
+            try { player.release() } catch (_: Exception) {}
+            players.remove(player)
             closeWindow(window)
         }
 
@@ -108,6 +111,10 @@ class FloatingWindowManager(
     }
 
     fun closeAll() {
+        for (player in players) {
+            try { player.release() } catch (_: Exception) {}
+        }
+        players.clear()
         val copy = windows.toList()
         for (window in copy) {
             window.removeFromParent()
