@@ -7,10 +7,15 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import com.lei.save_box.databinding.ActivityFakeHomeBinding
 import com.lei.save_box.manager.BiometricHelper
 import com.lei.save_box.manager.FileManager
 import com.lei.save_box.manager.SettingsManager
+import com.lei.save_box.view.ProgressDialogHelper
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.concurrent.Executor
 
 class FakeHomeActivity : AppCompatActivity() {
@@ -69,21 +74,39 @@ class FakeHomeActivity : AppCompatActivity() {
                 }
             }
         } else {
-            intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)?.let { uris.add(it) }
+            if (android.os.Build.VERSION.SDK_INT >= 33) {
+                intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)?.let { uris.add(it) }
+            } else {
+                @Suppress("DEPRECATION")
+                intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)?.let { uris.add(it) }
+            }
         }
 
         if (uris.isEmpty()) return
 
         val fileManager = FileManager(this)
-        var successCount = 0
-        for (uri in uris) {
-            if (fileManager.copyToVault(uri)) {
-                successCount++
-            }
-        }
+        val helper = ProgressDialogHelper(this)
+        val total = uris.size
 
-        if (successCount > 0) {
-            Toast.makeText(this, getString(R.string.share_import_success, successCount), Toast.LENGTH_SHORT).show()
+        lifecycleScope.launch(Dispatchers.IO) {
+            withContext(Dispatchers.Main) {
+                helper.show(getString(R.string.processing_share), total)
+            }
+            var successCount = 0
+            for ((index, uri) in uris.withIndex()) {
+                if (fileManager.copyToVault(uri)) {
+                    successCount++
+                }
+                withContext(Dispatchers.Main) {
+                    helper.updateProgress(index + 1, "$successCount / $total")
+                }
+            }
+            withContext(Dispatchers.Main) {
+                helper.dismiss()
+                if (successCount > 0) {
+                    Toast.makeText(this@FakeHomeActivity, getString(R.string.share_import_success, successCount), Toast.LENGTH_SHORT).show()
+                }
+            }
         }
     }
 

@@ -13,6 +13,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SwitchCompat
 import androidx.core.content.FileProvider
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.lei.save_box.adapter.FileAdapter
 import com.lei.save_box.databinding.ActivityVaultBinding
@@ -21,6 +22,10 @@ import com.lei.save_box.manager.FloatingWindowManager
 import com.lei.save_box.manager.SettingsManager
 import com.lei.save_box.manager.SortMode
 import com.lei.save_box.model.FileItem
+import com.lei.save_box.view.ProgressDialogHelper
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 class VaultActivity : AppCompatActivity() {
@@ -186,22 +191,41 @@ class VaultActivity : AppCompatActivity() {
     }
 
     private fun importFiles(uris: List<Uri>) {
-        var successCount = 0
-        for (uri in uris) {
-            if (fileManager.copyToVault(uri)) {
-                successCount++
+        if (uris.isEmpty()) return
+        val helper = ProgressDialogHelper(this)
+        val total = uris.size
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            withContext(Dispatchers.Main) {
+                helper.show(getString(R.string.importing_files), total)
             }
-        }
-        if (successCount > 0) {
-            Toast.makeText(this, "成功导入 $successCount 个文件", Toast.LENGTH_SHORT).show()
-            loadFiles()
+            var successCount = 0
+            for ((index, uri) in uris.withIndex()) {
+                if (fileManager.copyToVault(uri)) {
+                    successCount++
+                }
+                withContext(Dispatchers.Main) {
+                    helper.updateProgress(index + 1, "$successCount / $total")
+                }
+            }
+            withContext(Dispatchers.Main) {
+                helper.dismiss()
+                if (successCount > 0) {
+                    Toast.makeText(this@VaultActivity, "成功导入 $successCount 个文件", Toast.LENGTH_SHORT).show()
+                }
+                loadFiles()
+            }
         }
     }
 
     private fun loadFiles() {
-        val files = fileManager.listFiles(currentSortMode)
-        adapter.submitList(files)
-        updateEmptyView(files.isEmpty())
+        lifecycleScope.launch(Dispatchers.IO) {
+            val files = fileManager.listFiles(currentSortMode)
+            withContext(Dispatchers.Main) {
+                adapter.submitList(files)
+                updateEmptyView(files.isEmpty())
+            }
+        }
     }
 
     private fun updateEmptyView(isEmpty: Boolean) {
@@ -270,12 +294,21 @@ class VaultActivity : AppCompatActivity() {
             .setMessage(getString(R.string.confirm_delete_message, selectedItems.size))
             .setPositiveButton(R.string.confirm) { _, _ ->
                 val paths = selectedItems.map { it.path }
-                val deletedCount = fileManager.deleteFiles(paths)
-                if (deletedCount > 0) {
-                    Toast.makeText(this, "已删除 $deletedCount 个文件", Toast.LENGTH_SHORT).show()
+                val helper = ProgressDialogHelper(this@VaultActivity)
+                lifecycleScope.launch(Dispatchers.IO) {
+                    withContext(Dispatchers.Main) {
+                        helper.show(getString(R.string.deleting_files), paths.size)
+                    }
+                    val deletedCount = fileManager.deleteFiles(paths)
+                    withContext(Dispatchers.Main) {
+                        helper.dismiss()
+                        if (deletedCount > 0) {
+                            Toast.makeText(this@VaultActivity, "已删除 $deletedCount 个文件", Toast.LENGTH_SHORT).show()
+                        }
+                        adapter.exitSelectionMode()
+                        loadFiles()
+                    }
                 }
-                adapter.exitSelectionMode()
-                loadFiles()
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
@@ -311,7 +344,7 @@ class VaultActivity : AppCompatActivity() {
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
             startActivity(intent)
         }
-        pauseTimestamp=-1
+        pauseTimestamp = -1
     }
 
     override fun onDestroy() {
