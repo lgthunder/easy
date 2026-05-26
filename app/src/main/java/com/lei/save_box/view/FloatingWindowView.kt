@@ -74,6 +74,12 @@ class FloatingWindowView @JvmOverloads constructor(
         val ey = event.y
         val titleBarH = binding.titleBar.height.toFloat()
 
+        if (binding.volumeBar.visibility == View.VISIBLE) {
+            val volumeBarTop = titleBarH
+            val volumeBarBottom = titleBarH + binding.volumeBar.height
+            if (ey >= volumeBarTop && ey <= volumeBarBottom) return false
+        }
+
         val inRightEdge = ex >= (width - edgeThreshold) && ey > titleBarH
         val inBottomEdge = ey >= (height - edgeThreshold) && ex < (width - edgeThreshold) && ey > titleBarH
 
@@ -212,9 +218,61 @@ class FloatingWindowView @JvmOverloads constructor(
     private fun toggleOverlay() {
         if (binding.titleBar.visibility == View.VISIBLE) {
             binding.titleBar.visibility = View.GONE
+            binding.volumeBar.visibility = View.GONE
         } else {
             binding.titleBar.visibility = View.VISIBLE
         }
+    }
+
+    fun showMuteButton(show: Boolean) {
+        binding.btnMute.visibility = if (show) View.VISIBLE else View.GONE
+    }
+
+    fun setMuted(muted: Boolean) {
+        binding.btnMute.setImageResource(
+            if (muted) android.R.drawable.ic_lock_silent_mode_off
+            else android.R.drawable.ic_lock_silent_mode
+        )
+        binding.btnMute.contentDescription = context.getString(
+            if (muted) R.string.unmute else R.string.mute
+        )
+    }
+
+    fun setOnMuteClickListener(listener: () -> Unit) {
+        binding.btnMute.setOnClickListener { listener() }
+    }
+
+    fun setOnMuteLongClickListener(listener: () -> Unit) {
+        binding.btnMute.setOnLongClickListener {
+            listener()
+            true
+        }
+    }
+
+    fun toggleVolumeBar() {
+        binding.volumeBar.visibility = if (binding.volumeBar.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+    }
+
+    fun hideVolumeBar() {
+        binding.volumeBar.visibility = View.GONE
+    }
+
+    fun setVolume(volume: Int) {
+        binding.sbVolume.progress = volume
+    }
+
+    fun getVolumeProgress(): Int {
+        return binding.sbVolume.progress
+    }
+
+    fun setOnVolumeChangeListener(listener: (Int) -> Unit) {
+        binding.sbVolume.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: android.widget.SeekBar, progress: Int, fromUser: Boolean) {
+                if (fromUser) listener(progress)
+            }
+            override fun onStartTrackingTouch(seekBar: android.widget.SeekBar) {}
+            override fun onStopTrackingTouch(seekBar: android.widget.SeekBar) {}
+        })
     }
 
     fun setOnCloseListener(listener: () -> Unit) {

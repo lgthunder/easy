@@ -6,7 +6,6 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.Toast
 import androidx.media3.common.MediaItem
-import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import coil.load
@@ -60,12 +59,34 @@ class FloatingWindowManager(
         val playerView = PlayerView(context).apply {
             this.player = player
             useController = true
+            controllerAutoShow = true
+            controllerShowTimeoutMs = 3000
         }
         player.setMediaItem(MediaItem.fromUri(file.toURI().toString()))
         player.prepare()
         player.playWhenReady = true
 
         window.setContent(playerView)
+
+        window.showMuteButton(true)
+        window.setMuted(false)
+        window.setVolume(50)
+        window.setOnMuteClickListener {
+            val muted = player.volume > 0f
+            player.volume = if (muted) 0f else (window.getVolumeProgress() / 100f)
+            window.setMuted(!muted)
+            if (!muted) {
+                window.setVolume((player.volume * 100).toInt())
+            }
+        }
+        window.setOnMuteLongClickListener {
+            window.toggleVolumeBar()
+        }
+        window.setOnVolumeChangeListener { progress ->
+            val vol = progress / 100f
+            player.volume = vol
+            window.setMuted(progress == 0)
+        }
 
         window.setOnCloseListener {
             player.release()

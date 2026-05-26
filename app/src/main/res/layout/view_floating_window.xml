@@ -34,6 +34,15 @@
             android:textSize="12sp" />
 
         <ImageButton
+            android:id="@+id/btnMute"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/mute"
+            android:src="@android:drawable/ic_lock_silent_mode"
+            android:visibility="gone" />
+
+        <ImageButton
             android:id="@+id/btnFullscreen"
             android:layout_width="28dp"
             android:layout_height="28dp"
@@ -48,6 +57,31 @@
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/close"
             android:src="@android:drawable/ic_menu_close_clear_cancel" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/volumeBar"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:layout_gravity="top"
+        android:layout_marginTop="40dp"
+        android:background="#80000000"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:visibility="gone">
+
+        <SeekBar
+            android:id="@+id/sbVolume"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:max="100"
+            android:progress="50"
+            android:thumbTint="#FF6200EE"
+            android:progressTint="#FF6200EE" />
 
     </LinearLayout>
 
