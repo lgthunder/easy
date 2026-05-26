@@ -117,6 +117,9 @@ class VaultActivity : AppCompatActivity() {
             getString(R.string.sort_by_date),
             getString(R.string.sort_by_size),
             getString(R.string.sort_by_type),
+            getString(R.string.tile_horizontal),
+            getString(R.string.tile_vertical),
+            getString(R.string.tile_grid),
             getString(R.string.settings),
             getString(R.string.exit_app)
         )
@@ -128,8 +131,11 @@ class VaultActivity : AppCompatActivity() {
                     1 -> toggleSort(SortMode.DATE_ASC, SortMode.DATE_DESC)
                     2 -> toggleSort(SortMode.SIZE_ASC, SortMode.SIZE_DESC)
                     3 -> toggleSort(SortMode.TYPE_ASC, SortMode.TYPE_DESC)
-                    4 -> showSettingsDialog()
-                    5 -> showExitDialog()
+                    4 -> floatingWindowManager.tileHorizontal()
+                    5 -> floatingWindowManager.tileVertical()
+                    6 -> floatingWindowManager.tileGrid()
+                    7 -> showSettingsDialog()
+                    8 -> showExitDialog()
                 }
             }
             .show()

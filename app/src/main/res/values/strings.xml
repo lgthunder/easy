@@ -34,4 +34,7 @@
     <string name="selected_count">已选 %d 项</string>
     <string name="exit_app">退出应用</string>
     <string name="exit_app_confirm">确定要退出保险箱吗？</string>
+    <string name="tile_horizontal">水平平铺</string>
+    <string name="tile_vertical">垂直平铺</string>
+    <string name="tile_grid">井字平铺</string>
 </resources>

@@ -6,6 +6,8 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.Toast
+import kotlin.math.ceil
+import kotlin.math.sqrt
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
@@ -122,6 +124,67 @@ class FloatingWindowManager(
             window.removeFromParent()
         }
         windows.clear()
+    }
+
+    fun tileHorizontal() {
+        val list = windows.toList()
+        if (list.isEmpty()) return
+        val containerW = container.width
+        val containerH = container.height
+        if (containerW == 0 || containerH == 0) return
+
+        val count = list.size
+        val eachW = containerW / count
+        val eachH = containerH
+
+        for ((i, window) in list.withIndex()) {
+            window.layoutParams = FrameLayout.LayoutParams(eachW, eachH)
+            window.x = (i * eachW).toFloat()
+            window.y = 0f
+            saveWindowState(window)
+        }
+    }
+
+    fun tileVertical() {
+        val list = windows.toList()
+        if (list.isEmpty()) return
+        val containerW = container.width
+        val containerH = container.height
+        if (containerW == 0 || containerH == 0) return
+
+        val count = list.size
+        val eachW = containerW
+        val eachH = containerH / count
+
+        for ((i, window) in list.withIndex()) {
+            window.layoutParams = FrameLayout.LayoutParams(eachW, eachH)
+            window.x = 0f
+            window.y = (i * eachH).toFloat()
+            saveWindowState(window)
+        }
+    }
+
+    fun tileGrid() {
+        val list = windows.toList()
+        if (list.isEmpty()) return
+        val containerW = container.width
+        val containerH = container.height
+        if (containerW == 0 || containerH == 0) return
+
+        val count = list.size
+        val cols = ceil(sqrt(count.toDouble())).toInt()
+        val rows = ceil(count.toDouble() / cols).toInt()
+        val eachW = containerW / cols
+        val eachH = containerH / rows
+
+        for ((i, window) in list.withIndex()) {
+            val col = i % cols
+            val row = i / cols
+            window.layoutParams = FrameLayout.LayoutParams(eachW, eachH)
+            window.x = (col * eachW).toFloat()
+            window.y = (row * eachH).toFloat()
+            saveWindowState(window)
+        }
     }
 
     private fun closeWindow(window: FloatingWindowView) {
