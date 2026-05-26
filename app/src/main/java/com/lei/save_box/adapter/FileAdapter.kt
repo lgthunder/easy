@@ -1,5 +1,6 @@
 package com.lei.save_box.adapter
 
+import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
 import android.view.LayoutInflater
 import android.view.ViewGroup
@@ -123,9 +124,11 @@ class FileAdapter(
             val retriever = MediaMetadataRetriever()
             try {
                 retriever.setDataSource(file.absolutePath)
-                val bitmap = retriever.frameAtTime
-                if (bitmap != null) {
-                    binding.ivFileIcon.setImageBitmap(bitmap)
+                var   rawBitmap =   extractNonBlackFrame(retriever)
+                if (rawBitmap != null) {
+                    val thumb = Bitmap.createScaledBitmap(rawBitmap, 128, 128, true)
+                    if (thumb !== rawBitmap) rawBitmap.recycle()
+                    binding.ivFileIcon.setImageBitmap(thumb)
                 } else {
                     binding.ivFileIcon.setImageResource(android.R.drawable.ic_media_play)
                 }
@@ -136,6 +139,32 @@ class FileAdapter(
                     retriever.release()
                 } catch (_: Exception) {}
             }
+        }
+
+        private fun extractNonBlackFrame(retriever: MediaMetadataRetriever): Bitmap? {
+            val offsets = longArrayOf(0,1_000_000, 500_000, 2_000_000, 10_000_000, 0)
+            for (offset in offsets) {
+                val frame = retriever.getFrameAtTime(offset, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                if (frame != null && !isMostlyBlack(frame)) return frame
+            }
+            return retriever.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+        }
+
+        private fun isMostlyBlack(bitmap: Bitmap): Boolean {
+            val sampleSize = 10
+            var darkPixels = 0
+            var totalSamples = 0
+            for (y in 0 until bitmap.height step sampleSize) {
+                for (x in 0 until bitmap.width step sampleSize) {
+                    val pixel = bitmap.getPixel(x, y)
+                    val r = (pixel shr 16) and 0xFF
+                    val g = (pixel shr 8) and 0xFF
+                    val b = pixel and 0xFF
+                    if (r < 30 && g < 30 && b < 30) darkPixels++
+                    totalSamples++
+                }
+            }
+            return totalSamples > 0 && darkPixels.toFloat() / totalSamples > 0.8f
         }
     }
 
