@@ -1,12 +1,15 @@
 package com.lei.save_box.adapter
 
+import android.media.MediaMetadataRetriever
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import coil.load
 import com.lei.save_box.databinding.ItemFileBinding
 import com.lei.save_box.model.FileItem
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -71,14 +74,26 @@ class FileAdapter(
             binding.tvFileSize.text = item.formattedSize
             binding.tvFileDate.text = dateFormat.format(Date(item.lastModified))
 
-            val iconRes = when {
-                item.isImage -> android.R.drawable.ic_menu_gallery
-                item.isVideo -> android.R.drawable.ic_media_play
-                item.isAudio -> android.R.drawable.ic_media_play
-                item.isDocument -> android.R.drawable.ic_menu_edit
-                else -> android.R.drawable.ic_menu_save
+            val file = File(item.path)
+            when {
+                item.isImage -> {
+                    binding.ivFileIcon.load(file) {
+                        size(96, 96)
+                        crossfade(true)
+                    }
+                }
+                item.isVideo -> {
+                    loadVideoThumbnail(file)
+                }
+                else -> {
+                    val iconRes = when {
+                        item.isAudio -> android.R.drawable.ic_media_play
+                        item.isDocument -> android.R.drawable.ic_menu_edit
+                        else -> android.R.drawable.ic_menu_save
+                    }
+                    binding.ivFileIcon.setImageResource(iconRes)
+                }
             }
-            binding.ivFileIcon.setImageResource(iconRes)
 
             if (selectionMode) {
                 binding.cbSelect.visibility = android.view.View.VISIBLE
@@ -90,17 +105,36 @@ class FileAdapter(
 
             binding.root.setOnLongClickListener {
                 if (!isSelectionMode) {
-                    enterSelectionMode(adapterPosition)
+                    enterSelectionMode(bindingAdapterPosition)
                 }
                 true
             }
 
             binding.root.setOnClickListener {
                 if (isSelectionMode) {
-                    toggleSelection(adapterPosition)
+                    toggleSelection(bindingAdapterPosition)
                 } else {
                     onItemClick(item)
                 }
+            }
+        }
+
+        private fun loadVideoThumbnail(file: File) {
+            val retriever = MediaMetadataRetriever()
+            try {
+                retriever.setDataSource(file.absolutePath)
+                val bitmap = retriever.frameAtTime
+                if (bitmap != null) {
+                    binding.ivFileIcon.setImageBitmap(bitmap)
+                } else {
+                    binding.ivFileIcon.setImageResource(android.R.drawable.ic_media_play)
+                }
+            } catch (e: Exception) {
+                binding.ivFileIcon.setImageResource(android.R.drawable.ic_media_play)
+            } finally {
+                try {
+                    retriever.release()
+                } catch (_: Exception) {}
             }
         }
     }

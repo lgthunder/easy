@@ -17,4 +17,13 @@
     <string name="files_count">%d 个文件</string>
     <string name="exit_vault">退出保险箱</string>
     <string name="exit_confirm">确定要退出保险箱吗？</string>
+    <string name="settings">设置</string>
+    <string name="biometric_toggle">开启生物识别验证</string>
+    <string name="biometric_toggle_desc">进入保险箱前需要指纹或人脸验证</string>
+    <string name="biometric_title">身份验证</string>
+    <string name="biometric_subtitle">请验证身份以进入保险箱</string>
+    <string name="biometric_not_available">设备不支持生物识别，请先设置指纹或面部解锁</string>
+    <string name="biometric_failed">验证失败，请重试</string>
+    <string name="biometric_error">验证出错，请重试</string>
+    <string name="close">关闭</string>
 </resources>

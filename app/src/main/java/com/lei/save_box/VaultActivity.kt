@@ -9,13 +9,14 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat.invalidateOptionsMenu
-import androidx.core.content.ContextCompat.startActivity
+import androidx.appcompat.widget.SwitchCompat
 import androidx.core.content.FileProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.lei.save_box.adapter.FileAdapter
 import com.lei.save_box.databinding.ActivityVaultBinding
 import com.lei.save_box.manager.FileManager
+import com.lei.save_box.manager.FloatingWindowManager
+import com.lei.save_box.manager.SettingsManager
 import com.lei.save_box.manager.SortMode
 import com.lei.save_box.model.FileItem
 import java.io.File
@@ -24,6 +25,8 @@ class VaultActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityVaultBinding
     private lateinit var fileManager: FileManager
+    private lateinit var settingsManager: SettingsManager
+    private lateinit var floatingWindowManager: FloatingWindowManager
     private lateinit var adapter: FileAdapter
     private var currentSortMode = SortMode.DATE_DESC
 
@@ -56,6 +59,8 @@ class VaultActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         fileManager = FileManager(this)
+        settingsManager = SettingsManager(this)
+        floatingWindowManager = FloatingWindowManager(this, binding.floatingContainer)
 
         setSupportActionBar(binding.toolbar)
         supportActionBar?.title = getString(R.string.vault_title)
@@ -67,7 +72,7 @@ class VaultActivity : AppCompatActivity() {
 
     private fun setupRecyclerView() {
         adapter = FileAdapter(
-            onItemClick = { item -> openFile(item) },
+            onItemClick = { item -> onFileClick(item) },
             onSelectionChanged = { count ->
                 supportActionBar?.apply {
                     if (count > 0) {
@@ -137,7 +142,17 @@ class VaultActivity : AppCompatActivity() {
         binding.rvFiles.visibility = if (isEmpty) View.GONE else View.VISIBLE
     }
 
-    private fun openFile(item: FileItem) {
+    private fun onFileClick(item: FileItem) {
+        if (item.isImage) {
+            floatingWindowManager.openImage(item.path)
+        } else if (item.isVideo) {
+            floatingWindowManager.openVideo(item.path)
+        } else {
+            openFileExternally(item)
+        }
+    }
+
+    private fun openFileExternally(item: FileItem) {
         val file = File(item.path)
         if (!file.exists()) {
             Toast.makeText(this, "文件不存在", Toast.LENGTH_SHORT).show()
@@ -159,6 +174,24 @@ class VaultActivity : AppCompatActivity() {
         } catch (e: Exception) {
             Toast.makeText(this, "无法打开文件", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun showSettingsDialog() {
+        val switchView = SwitchCompat(this).apply {
+            text = getString(R.string.biometric_toggle)
+            isChecked = settingsManager.isBiometricEnabled
+            setOnCheckedChangeListener { _, isChecked ->
+                settingsManager.isBiometricEnabled = isChecked
+            }
+            setPadding(40, 20, 40, 20)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle(R.string.settings)
+            .setMessage(R.string.biometric_toggle_desc)
+            .setView(switchView)
+            .setPositiveButton(R.string.confirm, null)
+            .show()
     }
 
     private fun deleteSelectedFiles() {
@@ -186,12 +219,17 @@ class VaultActivity : AppCompatActivity() {
 
         val isSelectionMode = adapter.isSelectionMode
         menu.findItem(R.id.action_sort).isVisible = !isSelectionMode
+        menu.findItem(R.id.action_settings).isVisible = !isSelectionMode
         menu.findItem(R.id.action_delete).isVisible = isSelectionMode
         return true
     }
 
     override fun onOptionsItemSelected(item: android.view.MenuItem): Boolean {
         return when (item.itemId) {
+            R.id.action_settings -> {
+                showSettingsDialog()
+                true
+            }
             R.id.action_delete -> {
                 deleteSelectedFiles()
                 true
@@ -234,6 +272,7 @@ class VaultActivity : AppCompatActivity() {
             .setTitle(R.string.exit_vault)
             .setMessage(R.string.exit_confirm)
             .setPositiveButton(R.string.confirm) { _, _ ->
+                floatingWindowManager.closeAll()
                 super.onBackPressed()
             }
             .setNegativeButton(R.string.cancel, null)
