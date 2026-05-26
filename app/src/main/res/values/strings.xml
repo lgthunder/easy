@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">save_box</string>
+    <string name="app_name">易速会议</string>
     <string name="vault_title">文件保险箱</string>
     <string name="import_file">导入文件</string>
     <string name="import_from_album">从相册导入</string>
