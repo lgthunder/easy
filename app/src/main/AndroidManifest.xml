@@ -26,7 +26,7 @@
         <activity
             android:name=".VaultActivity"
             android:exported="false"
-            android:theme="@style/Theme.Save_box.NoActionBar" />
+            android:theme="@style/Theme.Save_box.FullScreen" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

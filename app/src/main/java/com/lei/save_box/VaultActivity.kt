@@ -5,6 +5,8 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
 import android.view.View
+import android.view.WindowInsets
+import android.view.WindowInsetsController
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -58,53 +60,110 @@ class VaultActivity : AppCompatActivity() {
         binding = ActivityVaultBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        enterFullScreen()
+
         fileManager = FileManager(this)
         settingsManager = SettingsManager(this)
         floatingWindowManager = FloatingWindowManager(this, binding.floatingContainer)
 
-        setSupportActionBar(binding.toolbar)
-        supportActionBar?.title = getString(R.string.vault_title)
-
         setupRecyclerView()
-        setupFab()
+        setupFabs()
         loadFiles()
+    }
+
+    private fun enterFullScreen() {
+        window.insetsController?.let { controller ->
+            controller.hide(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
+            controller.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
     }
 
     private fun setupRecyclerView() {
         adapter = FileAdapter(
             onItemClick = { item -> onFileClick(item) },
-            onSelectionChanged = { count ->
-                supportActionBar?.apply {
-                    if (count > 0) {
-                        title = getString(R.string.files_count, count)
-                    } else {
-                        title = getString(R.string.vault_title)
-                    }
-                }
-                invalidateOptionsMenu()
-            }
+            onSelectionChanged = { count -> onSelectionCountChanged(count) }
         )
 
         binding.rvFiles.layoutManager = LinearLayoutManager(this)
         binding.rvFiles.adapter = adapter
     }
 
-    private fun setupFab() {
-        binding.fabImport.setOnClickListener {
-            val items = arrayOf(
-                getString(R.string.import_from_album),
-                getString(R.string.import_from_file)
-            )
-            AlertDialog.Builder(this)
-                .setTitle(R.string.import_file)
-                .setItems(items) { _, which ->
-                    when (which) {
-                        0 -> openImagePicker()
-                        1 -> openFilePicker()
-                    }
-                }
-                .show()
+    private fun setupFabs() {
+        binding.fabImport.setOnClickListener { showImportDialog() }
+        binding.fabMenu.setOnClickListener { showMenuDialog() }
+        binding.fabDelete.setOnClickListener { deleteSelectedFiles() }
+    }
+
+    private fun onSelectionCountChanged(count: Int) {
+        if (count > 0) {
+            binding.chipSelectionCount.visibility = View.VISIBLE
+            binding.chipSelectionCount.text = getString(R.string.selected_count, count)
+            binding.fabImport.visibility = View.GONE
+            binding.fabMenu.visibility = View.GONE
+            binding.fabDelete.visibility = View.VISIBLE
+        } else {
+            binding.chipSelectionCount.visibility = View.GONE
+            binding.fabImport.visibility = View.VISIBLE
+            binding.fabMenu.visibility = View.VISIBLE
+            binding.fabDelete.visibility = View.GONE
         }
+    }
+
+    private fun showMenuDialog() {
+        val items = arrayOf(
+            getString(R.string.sort_by_name),
+            getString(R.string.sort_by_date),
+            getString(R.string.sort_by_size),
+            getString(R.string.sort_by_type),
+            getString(R.string.settings),
+            getString(R.string.exit_app)
+        )
+        AlertDialog.Builder(this)
+            .setTitle(R.string.menu)
+            .setItems(items) { _, which ->
+                when (which) {
+                    0 -> toggleSort(SortMode.NAME_ASC, SortMode.NAME_DESC)
+                    1 -> toggleSort(SortMode.DATE_ASC, SortMode.DATE_DESC)
+                    2 -> toggleSort(SortMode.SIZE_ASC, SortMode.SIZE_DESC)
+                    3 -> toggleSort(SortMode.TYPE_ASC, SortMode.TYPE_DESC)
+                    4 -> showSettingsDialog()
+                    5 -> showExitDialog()
+                }
+            }
+            .show()
+    }
+
+    private fun toggleSort(asc: SortMode, desc: SortMode) {
+        currentSortMode = if (currentSortMode == asc) desc else asc
+        loadFiles()
+    }
+
+    private fun showImportDialog() {
+        val items = arrayOf(
+            getString(R.string.import_from_album),
+            getString(R.string.import_from_file)
+        )
+        AlertDialog.Builder(this)
+            .setTitle(R.string.import_file)
+            .setItems(items) { _, which ->
+                when (which) {
+                    0 -> openImagePicker()
+                    1 -> openFilePicker()
+                }
+            }
+            .show()
+    }
+
+    private fun showExitDialog() {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.exit_app)
+            .setMessage(R.string.exit_app_confirm)
+            .setPositiveButton(R.string.confirm) { _, _ ->
+                floatingWindowManager.closeAll()
+                finish()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
     }
 
     private fun openImagePicker() {
@@ -214,68 +273,19 @@ class VaultActivity : AppCompatActivity() {
             .show()
     }
 
-    override fun onCreateOptionsMenu(menu: android.view.Menu): Boolean {
-        menuInflater.inflate(R.menu.menu_vault_sort, menu)
-
-        val isSelectionMode = adapter.isSelectionMode
-        menu.findItem(R.id.action_sort).isVisible = !isSelectionMode
-        menu.findItem(R.id.action_settings).isVisible = !isSelectionMode
-        menu.findItem(R.id.action_delete).isVisible = isSelectionMode
-        return true
-    }
-
-    override fun onOptionsItemSelected(item: android.view.MenuItem): Boolean {
-        return when (item.itemId) {
-            R.id.action_settings -> {
-                showSettingsDialog()
-                true
-            }
-            R.id.action_delete -> {
-                deleteSelectedFiles()
-                true
-            }
-            R.id.action_sort_name -> {
-                currentSortMode = if (currentSortMode == SortMode.NAME_ASC)
-                    SortMode.NAME_DESC else SortMode.NAME_ASC
-                loadFiles()
-                true
-            }
-            R.id.action_sort_date -> {
-                currentSortMode = if (currentSortMode == SortMode.DATE_ASC)
-                    SortMode.DATE_DESC else SortMode.DATE_ASC
-                loadFiles()
-                true
-            }
-            R.id.action_sort_size -> {
-                currentSortMode = if (currentSortMode == SortMode.SIZE_ASC)
-                    SortMode.SIZE_DESC else SortMode.SIZE_ASC
-                loadFiles()
-                true
-            }
-            R.id.action_sort_type -> {
-                currentSortMode = if (currentSortMode == SortMode.TYPE_ASC)
-                    SortMode.TYPE_DESC else SortMode.TYPE_ASC
-                loadFiles()
-                true
-            }
-            else -> super.onOptionsItemSelected(item)
-        }
-    }
-
     override fun onBackPressed() {
         if (adapter.isSelectionMode) {
             adapter.exitSelectionMode()
             return
         }
 
-        AlertDialog.Builder(this)
-            .setTitle(R.string.exit_vault)
-            .setMessage(R.string.exit_confirm)
-            .setPositiveButton(R.string.confirm) { _, _ ->
-                floatingWindowManager.closeAll()
-                super.onBackPressed()
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
+        showExitDialog()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            enterFullScreen()
+        }
     }
 }
