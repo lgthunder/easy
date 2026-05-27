@@ -1,6 +1,7 @@
 package com.lei.save_box
 
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -80,13 +81,15 @@ class VideoEditActivity : AppCompatActivity() {
 
     private fun setupButtons() {
         binding.trimRangeView.onSeeking = { timeMs ->
+            Log.d("VideoEditActivity","onSeeking timeMs $timeMs")
             player?.let { p ->
                 p.pause()
                 p.seekTo(timeMs)
             }
         }
 
-        binding.trimRangeView.onRangeChanged = { _, _ ->
+        binding.trimRangeView.onRangeChanged = { start, end ->
+            Log.d("VideoEditActivity","onRangeChanged start $start  end $end")
             updateTimeText()
         }
 
@@ -162,6 +165,9 @@ class VideoEditActivity : AppCompatActivity() {
                     if (!outputFile.exists()) continue
                     val size = outputFile.length()
                     kotlinx.coroutines.delay(300)
+                    withContext(Dispatchers.Main) {
+                        helper.updateProgress((outputFile.length()*100f / size).toInt(),"")
+                    }
                     if (outputFile.length() == size && size > 0) break
                 }
                 withContext(Dispatchers.Main) {
