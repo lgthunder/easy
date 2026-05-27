@@ -1,7 +1,10 @@
 package com.lei.save_box.adapter
 
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
+import android.os.Handler
+import android.os.Looper
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
@@ -14,6 +17,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.Executors
 
 class FileAdapter(
     private val onItemClick: (FileItem) -> Unit,
@@ -21,6 +25,8 @@ class FileAdapter(
 ) : ListAdapter<FileItem, FileAdapter.ViewHolder>(DiffCallback) {
 
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+    private val thumbnailExecutor = Executors.newFixedThreadPool(4)
+    private val mainHandler = Handler(Looper.getMainLooper())
     var isSelectionMode = false
         private set
 
@@ -121,28 +127,44 @@ class FileAdapter(
         }
 
         private fun loadVideoThumbnail(file: File) {
-            val retriever = MediaMetadataRetriever()
-            try {
-                retriever.setDataSource(file.absolutePath)
-                var   rawBitmap =   extractNonBlackFrame(retriever)
-                if (rawBitmap != null) {
-                    val thumb = Bitmap.createScaledBitmap(rawBitmap, 128, 128, true)
-                    if (thumb !== rawBitmap) rawBitmap.recycle()
-                    binding.ivFileIcon.setImageBitmap(thumb)
-                } else {
-                    binding.ivFileIcon.setImageResource(android.R.drawable.ic_media_play)
-                }
-            } catch (e: Exception) {
-                binding.ivFileIcon.setImageResource(android.R.drawable.ic_media_play)
-            } finally {
+            binding.ivFileIcon.setImageResource(android.R.drawable.ic_media_play)
+            val targetPath = file.absolutePath
+            thumbnailExecutor.execute {
+                val retriever = MediaMetadataRetriever()
                 try {
-                    retriever.release()
-                } catch (_: Exception) {}
+                    retriever.setDataSource(targetPath)
+                    val embedded = retriever.embeddedPicture
+                    val rawBitmap = if (embedded != null) {
+                        BitmapFactory.decodeByteArray(embedded, 0, embedded.size)
+                    } else {
+                        extractNonBlackFrame(retriever)
+                    }
+                    val result: Any = if (rawBitmap != null) {
+                        val thumb = Bitmap.createScaledBitmap(rawBitmap, 128, 128, true)
+                        if (thumb !== rawBitmap) rawBitmap.recycle()
+                        thumb
+                    } else {
+                        -1
+                    }
+                    mainHandler.post {
+                        if (bindingAdapterPosition != RecyclerView.NO_POSITION) {
+                            val currentItem = getItem(bindingAdapterPosition)
+                            if (currentItem.path == targetPath) {
+                                if (result is Bitmap) {
+                                    binding.ivFileIcon.setImageBitmap(result)
+                                }
+                            }
+                        }
+                    }
+                } catch (_: Exception) {
+                } finally {
+                    try { retriever.release() } catch (_: Exception) {}
+                }
             }
         }
 
         private fun extractNonBlackFrame(retriever: MediaMetadataRetriever): Bitmap? {
-            val offsets = longArrayOf(0,1_000_000, 500_000, 2_000_000, 10_000_000, 0)
+            val offsets = longArrayOf(1_000_000, 500_000, 2_000_000, 10_000_000, 0)
             for (offset in offsets) {
                 val frame = retriever.getFrameAtTime(offset, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
                 if (frame != null && !isMostlyBlack(frame)) return frame
