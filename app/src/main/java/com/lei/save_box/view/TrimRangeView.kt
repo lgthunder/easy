@@ -8,6 +8,7 @@ import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
+import androidx.core.graphics.toRect
 
 class TrimRangeView @JvmOverloads constructor(
     context: Context,
@@ -36,6 +37,11 @@ class TrimRangeView @JvmOverloads constructor(
         style = Paint.Style.STROKE
         strokeWidth = 4f
     }
+    private val positionLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFFFFEB3B.toInt()
+        style = Paint.Style.STROKE
+        strokeWidth = 3f
+    }
     private val thumbSrcRect = RectF()
     private val thumbDstRect = RectF()
 
@@ -53,6 +59,12 @@ class TrimRangeView @JvmOverloads constructor(
         private set
     var endMs: Long = 0L
         private set
+
+    var currentPositionMs: Long = 0L
+        set(value) {
+            field = value
+            invalidate()
+        }
 
     var onRangeChanged: ((Long, Long) -> Unit)? = null
     var onSeeking: ((Long) -> Unit)? = null
@@ -100,6 +112,12 @@ class TrimRangeView @JvmOverloads constructor(
 
             drawHandle(canvas, startX, h / 2)
             drawHandle(canvas, endX, h / 2)
+
+            if (currentPositionMs > 0 && currentPositionMs <= durationMs) {
+                val posX = (currentPositionMs.toFloat() / durationMs) * w
+                canvas.drawLine(posX, trackTop, posX, trackBottom, positionLinePaint)
+                canvas.drawCircle(posX, h / 2, 5f, positionLinePaint)
+            }
         }
     }
 
@@ -112,7 +130,7 @@ class TrimRangeView @JvmOverloads constructor(
             val bmp = thumbnails[i % thumbnails.size]
             thumbSrcRect.set(0f, 0f, bmp.width.toFloat(), bmp.height.toFloat())
             thumbDstRect.set(i * cellW, top, (i + 1) * cellW, bottom)
-            canvas.drawBitmap(bmp, null, thumbDstRect, null)
+            canvas.drawBitmap(bmp, thumbSrcRect.toRect(), thumbDstRect, null)
         }
     }
 

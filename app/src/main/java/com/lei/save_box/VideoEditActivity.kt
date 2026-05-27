@@ -3,6 +3,8 @@ package com.lei.save_box
 import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -27,8 +29,20 @@ class VideoEditActivity : AppCompatActivity() {
     private var originalEnd: Long = 0
     private var sourcePath: String = ""
 
-    private val thumbnailThCount = 60
+    private val thumbnailThCount = 20
     private val thumbnailHeightDp = 60
+
+    private val positionHandler = Handler(Looper.getMainLooper())
+    private val positionUpdater = object : Runnable {
+        override fun run() {
+            player?.let { p ->
+                if (p.isPlaying) {
+                    binding.trimRangeView.currentPositionMs = p.currentPosition
+                }
+            }
+            positionHandler.postDelayed(this, 100)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -71,8 +85,11 @@ class VideoEditActivity : AppCompatActivity() {
                         updateTimeText()
                         generateThumbnails(file, duration)
                     }
+                    positionHandler.removeCallbacks(positionUpdater)
+                    positionHandler.post(positionUpdater)
                 }
                 if (state == Player.STATE_ENDED) {
+                    binding.trimRangeView.currentPositionMs = 0L
                     p.seekTo(binding.trimRangeView.startMs)
                     p.play()
                 }
@@ -84,6 +101,7 @@ class VideoEditActivity : AppCompatActivity() {
                 } else {
                     binding.btnPlayPause.setImageResource(android.R.drawable.ic_media_play)
                 }
+                binding.trimRangeView.currentPositionMs = p.currentPosition
             }
         })
     }
@@ -121,15 +139,14 @@ class VideoEditActivity : AppCompatActivity() {
 
     private fun setupButtons() {
         binding.trimRangeView.onSeeking = { timeMs ->
-            Log.d("VideoEditActivity","onSeeking timeMs $timeMs")
+            binding.trimRangeView.currentPositionMs = timeMs
             player?.let { p ->
                 p.pause()
                 p.seekTo(timeMs)
             }
         }
 
-        binding.trimRangeView.onRangeChanged = { start, end ->
-            Log.d("VideoEditActivity","onRangeChanged start $start  end $end")
+        binding.trimRangeView.onRangeChanged = { _, _ ->
             updateTimeText()
         }
 
@@ -226,6 +243,7 @@ class VideoEditActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        positionHandler.removeCallbacks(positionUpdater)
         player?.release()
         player = null
     }
