@@ -352,6 +352,8 @@ class VaultActivity : AppCompatActivity() {
             val intent = Intent(this, FakeHomeActivity::class.java)
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
             startActivity(intent)
+        } else if (pauseTimestamp > 0) {
+            loadFiles()
         }
         pauseTimestamp = -1
     }

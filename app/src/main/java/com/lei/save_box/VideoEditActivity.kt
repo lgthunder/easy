@@ -135,8 +135,10 @@ class VideoEditActivity : AppCompatActivity() {
 
         val helper = ProgressDialogHelper(this)
         val sourceFile = File(sourcePath)
+        val sourceName = sourceFile.nameWithoutExtension
         val outputDir = FileManager(this).vaultDir
-        val outputFile = File(outputDir, "edited_${System.currentTimeMillis()}.mp4")
+        val timestamp = System.currentTimeMillis()
+        val outputFile = File(outputDir, "edited_${sourceName}_${timestamp}.mp4")
 
         helper.show(getString(R.string.trimming_video), 100)
 
