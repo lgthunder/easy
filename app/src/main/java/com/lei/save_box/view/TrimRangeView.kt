@@ -45,8 +45,9 @@ class TrimRangeView @JvmOverloads constructor(
         private set
 
     var onRangeChanged: ((Long, Long) -> Unit)? = null
+    var onSeeking: ((Long) -> Unit)? = null
 
-    private val handleRadius = 24f
+    private val handleRadius = 20f
     private var dragging: Int = DRAG_NONE
 
     companion object {
@@ -88,15 +89,14 @@ class TrimRangeView @JvmOverloads constructor(
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (durationMs <= 0) return false
         val x = event.x
-        val y = event.y
         val w = width.toFloat()
         val startX = (startMs.toFloat() / durationMs) * w
         val endX = (endMs.toFloat() / durationMs) * w
 
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
-                val distStart = Math.hypot((x - startX).toDouble(), (y - height / 2f).toDouble())
-                val distEnd = Math.hypot((x - endX).toDouble(), (y - height / 2f).toDouble())
+                val distStart = Math.hypot((x - startX).toDouble(), (event.y - height / 2f).toDouble())
+                val distEnd = Math.hypot((x - endX).toDouble(), (event.y - height / 2f).toDouble())
                 dragging = when {
                     distStart < handleRadius * 2 -> DRAG_START
                     distEnd < handleRadius * 2 -> DRAG_END
@@ -110,24 +110,28 @@ class TrimRangeView @JvmOverloads constructor(
                 when (dragging) {
                     DRAG_START -> {
                         startMs = timeAtPos.coerceIn(0, endMs - 100)
-                        onRangeChanged?.invoke(startMs, endMs)
+                        onSeeking?.invoke(startMs)
                     }
                     DRAG_END -> {
                         endMs = timeAtPos.coerceIn(startMs + 100, durationMs)
-                        onRangeChanged?.invoke(startMs, endMs)
+                        onSeeking?.invoke(endMs)
                     }
                 }
                 invalidate()
                 return true
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                val finalX = if (dragging == DRAG_START) startMs else endMs
-                val finalRatio = (finalX.toFloat() / durationMs).coerceIn(0f, 1f)
-                val snapTime = (finalRatio * durationMs).toLong()
-                if (dragging == DRAG_START) {
-                    startMs = snapTime.coerceIn(0, endMs - 100)
-                } else if (dragging == DRAG_END) {
-                    endMs = snapTime.coerceIn(startMs + 100, durationMs)
+                val ratio = (x / w).coerceIn(0f, 1f)
+                val timeAtPos = (ratio * durationMs).toLong()
+                when (dragging) {
+                    DRAG_START -> {
+                        startMs = timeAtPos.coerceIn(0, endMs - 100)
+                        onSeeking?.invoke(startMs)
+                    }
+                    DRAG_END -> {
+                        endMs = timeAtPos.coerceIn(startMs + 100, durationMs)
+                        onSeeking?.invoke(endMs)
+                    }
                 }
                 onRangeChanged?.invoke(startMs, endMs)
                 dragging = DRAG_NONE

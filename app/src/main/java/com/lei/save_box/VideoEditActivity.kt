@@ -46,8 +46,7 @@ class VideoEditActivity : AppCompatActivity() {
         binding.playerView.useController = false
 
         val file = File(sourcePath)
-        val mediaItem = MediaItem.fromUri(file.toURI().toString())
-        p.setMediaItem(mediaItem)
+        p.setMediaItem(MediaItem.fromUri(file.toURI().toString()))
         p.prepare()
         p.playWhenReady = false
         p.repeatMode = Player.REPEAT_MODE_OFF
@@ -63,34 +62,30 @@ class VideoEditActivity : AppCompatActivity() {
                         updateTimeText()
                     }
                 }
-            }
-
-            override fun onPositionDiscontinuity(
-                oldPosition: Player.PositionInfo,
-                newPosition: Player.PositionInfo,
-                reason: Int
-            ) {
-                if (reason == Player.DISCONTINUITY_REASON_INTERNAL) {
-                    val end = binding.trimRangeView.endMs
-                    if (p.currentPosition >= end && p.isPlaying) {
-                        p.seekTo(binding.trimRangeView.startMs)
-                    }
+                if (state == Player.STATE_ENDED) {
+                    p.seekTo(binding.trimRangeView.startMs)
+                    p.play()
                 }
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 if (isPlaying) {
-                    val cur = p.currentPosition
-                    val end = binding.trimRangeView.endMs
-                    if (cur < binding.trimRangeView.startMs || cur >= end) {
-                        p.seekTo(binding.trimRangeView.startMs)
-                    }
+                    binding.btnPlayPause.setImageResource(android.R.drawable.ic_media_pause)
+                } else {
+                    binding.btnPlayPause.setImageResource(android.R.drawable.ic_media_play)
                 }
             }
         })
     }
 
     private fun setupButtons() {
+        binding.trimRangeView.onSeeking = { timeMs ->
+            player?.let { p ->
+                p.pause()
+                p.seekTo(timeMs)
+            }
+        }
+
         binding.trimRangeView.onRangeChanged = { _, _ ->
             updateTimeText()
         }
@@ -99,22 +94,19 @@ class VideoEditActivity : AppCompatActivity() {
             val p = player ?: return@setOnClickListener
             if (p.isPlaying) {
                 p.pause()
-                binding.btnPlayPause.setImageResource(android.R.drawable.ic_media_play)
             } else {
-                val startPos = binding.trimRangeView.startMs
+                val start = binding.trimRangeView.startMs
                 val cur = p.currentPosition
-                if (cur < startPos || cur >= binding.trimRangeView.endMs) {
-                    p.seekTo(startPos)
+                if (cur < start || cur >= binding.trimRangeView.endMs) {
+                    p.seekTo(start)
                 }
                 p.play()
-                binding.btnPlayPause.setImageResource(android.R.drawable.ic_media_pause)
             }
         }
 
         binding.btnUndo.setOnClickListener {
             val p = player ?: return@setOnClickListener
             p.pause()
-            binding.btnPlayPause.setImageResource(android.R.drawable.ic_media_play)
             binding.trimRangeView.setRange(originalStart, originalEnd)
             updateTimeText()
             p.seekTo(originalStart)
@@ -138,6 +130,9 @@ class VideoEditActivity : AppCompatActivity() {
             return
         }
 
+        val p = player
+        p?.pause()
+
         val helper = ProgressDialogHelper(this)
         val sourceFile = File(sourcePath)
         val outputDir = FileManager(this).vaultDir
@@ -156,9 +151,17 @@ class VideoEditActivity : AppCompatActivity() {
             )
             .build()
 
+        transformer.start(mediaItem, outputFile.absolutePath)
+
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                transformer.start(mediaItem, outputFile.absolutePath)
+                while (true) {
+                    kotlinx.coroutines.delay(300)
+                    if (!outputFile.exists()) continue
+                    val size = outputFile.length()
+                    kotlinx.coroutines.delay(300)
+                    if (outputFile.length() == size && size > 0) break
+                }
                 withContext(Dispatchers.Main) {
                     helper.dismiss()
                     Toast.makeText(this@VideoEditActivity, R.string.trim_success, Toast.LENGTH_SHORT).show()
@@ -167,7 +170,7 @@ class VideoEditActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     helper.dismiss()
-                    Toast.makeText(this@VideoEditActivity, "裁剪失败", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@VideoEditActivity, "裁剪失败: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
             }
         }
