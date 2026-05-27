@@ -305,6 +305,14 @@ class FloatingWindowView @JvmOverloads constructor(
         })
     }
 
+    fun setOnEditClickListener(listener: () -> Unit) {
+        binding.btnEdit.setOnClickListener { listener() }
+    }
+
+    fun showEditButton(show: Boolean) {
+        binding.btnEdit.visibility = if (show) View.VISIBLE else View.GONE
+    }
+
     fun setOnCloseListener(listener: () -> Unit) {
         onCloseListener = listener
     }

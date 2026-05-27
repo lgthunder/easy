@@ -43,6 +43,15 @@
             android:visibility="gone" />
 
         <ImageButton
+            android:id="@+id/btnEdit"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/video_edit"
+            android:src="@android:drawable/ic_menu_edit"
+            android:visibility="gone" />
+
+        <ImageButton
             android:id="@+id/btnFullscreen"
             android:layout_width="28dp"
             android:layout_height="28dp"

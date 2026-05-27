@@ -58,6 +58,11 @@
             android:exported="false"
             android:theme="@style/Theme.Save_box.FullScreen" />
 
+        <activity
+            android:name=".VideoEditActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Save_box.FullScreen" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

@@ -41,4 +41,11 @@
     <string name="importing_files">正在导入文件…</string>
     <string name="deleting_files">正在删除文件…</string>
     <string name="processing_share">正在接收分享文件…</string>
+    <string name="video_edit">编辑视频</string>
+    <string name="trim_save">保存裁剪</string>
+    <string name="trimming_video">正在裁剪视频…</string>
+    <string name="trim_success">视频裁剪完成</string>
+    <string name="undo">撤销</string>
+    <string name="play">播放</string>
+    <string name="pause">暂停</string>
 </resources>

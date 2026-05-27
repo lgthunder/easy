@@ -1,6 +1,7 @@
 package com.lei.save_box.manager
 
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -12,6 +13,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import coil.load
+import com.lei.save_box.VideoEditActivity
 import com.lei.save_box.view.FloatingWindowView
 import java.io.File
 
@@ -84,6 +86,13 @@ class FloatingWindowManager(
         window.showMuteButton(true)
         window.setMuted(true)
         window.setVolume(0)
+        window.showEditButton(true)
+        window.setOnEditClickListener {
+            val intent = Intent(context, VideoEditActivity::class.java)
+            intent.putExtra("video_path", file.absolutePath)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+        }
         window.setOnMuteClickListener {
             val muted = player.volume > 0f
             player.volume = if (muted) 0f else (window.getVolumeProgress() / 100f)
