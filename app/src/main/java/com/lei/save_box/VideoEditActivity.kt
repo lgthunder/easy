@@ -1,5 +1,7 @@
 package com.lei.save_box
 
+import android.graphics.Bitmap
+import android.media.MediaMetadataRetriever
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
@@ -25,6 +27,9 @@ class VideoEditActivity : AppCompatActivity() {
     private var originalEnd: Long = 0
     private var sourcePath: String = ""
 
+    private val thumbnailThCount = 60
+    private val thumbnailHeightDp = 60
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
@@ -46,6 +51,9 @@ class VideoEditActivity : AppCompatActivity() {
         binding.playerView.player = p
         binding.playerView.useController = false
 
+        binding.trimRangeView.thumbnailCount = thumbnailThCount
+        binding.trimRangeView.thumbnailHeight = thumbnailHeightDp * resources.displayMetrics.density
+
         val file = File(sourcePath)
         p.setMediaItem(MediaItem.fromUri(file.toURI().toString()))
         p.prepare()
@@ -61,6 +69,7 @@ class VideoEditActivity : AppCompatActivity() {
                         originalStart = 0
                         originalEnd = duration
                         updateTimeText()
+                        generateThumbnails(file, duration)
                     }
                 }
                 if (state == Player.STATE_ENDED) {
@@ -77,6 +86,37 @@ class VideoEditActivity : AppCompatActivity() {
                 }
             }
         })
+    }
+
+    private fun generateThumbnails(file: File, durationMs: Long) {
+        val count = thumbnailThCount
+        val interval = durationMs / count
+        if (interval <= 0) return
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            val thumbs = mutableListOf<Bitmap>()
+            val retriever = MediaMetadataRetriever()
+            try {
+                retriever.setDataSource(file.absolutePath)
+                for (i in 0 until count) {
+                    val timeUs = (interval * i + interval / 2) * 1000L
+                    val bmp = retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                    if (bmp != null) {
+                        val thumbH = (thumbnailHeightDp * resources.displayMetrics.density * 2).toInt()
+                        val thumbW = (bmp.width.toFloat() / bmp.height * thumbH).toInt().coerceAtLeast(1)
+                        val scaled = Bitmap.createScaledBitmap(bmp, thumbW, thumbH, true)
+                        if (scaled !== bmp) bmp.recycle()
+                        thumbs.add(scaled)
+                    }
+                }
+            } catch (_: Exception) {
+            } finally {
+                try { retriever.release() } catch (_: Exception) {}
+            }
+            withContext(Dispatchers.Main) {
+                binding.trimRangeView.setThumbnails(thumbs)
+            }
+        }
     }
 
     private fun setupButtons() {

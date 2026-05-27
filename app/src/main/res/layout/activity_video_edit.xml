@@ -56,7 +56,7 @@
         <com.lei.save_box.view.TrimRangeView
             android:id="@+id/trimRangeView"
             android:layout_width="match_parent"
-            android:layout_height="56dp"
+            android:layout_height="72dp"
             android:layout_marginTop="8dp" />
 
         <LinearLayout

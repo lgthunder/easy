@@ -1,8 +1,10 @@
 package com.lei.save_box.view
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
@@ -13,13 +15,17 @@ class TrimRangeView @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
-    private val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0x40FFFFFF
+    var thumbnailCount: Int = 60
+    var thumbnailHeight: Float = 60f
+
+    private val rangePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0x806200EE.toInt()
         style = Paint.Style.FILL
     }
-    private val rangePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = 0xFF6200EE.toInt()
-        style = Paint.Style.FILL
+        style = Paint.Style.STROKE
+        strokeWidth = 3f
     }
     private val handlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = 0xFFFFFFFF.toInt()
@@ -30,6 +36,10 @@ class TrimRangeView @JvmOverloads constructor(
         style = Paint.Style.STROKE
         strokeWidth = 4f
     }
+    private val thumbSrcRect = RectF()
+    private val thumbDstRect = RectF()
+
+    private var thumbnails: List<Bitmap> = emptyList()
 
     var durationMs: Long = 0L
         set(value) {
@@ -62,22 +72,47 @@ class TrimRangeView @JvmOverloads constructor(
         invalidate()
     }
 
+    fun setThumbnails(list: List<Bitmap>) {
+        thumbnails = list
+        invalidate()
+    }
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val w = width.toFloat()
         val h = height.toFloat()
-        val trackTop = h / 2 - 4f
-        val trackBottom = h / 2 + 4f
+        val trackH = thumbnailHeight
+        val trackTop = (h - trackH) / 2f
+        val trackBottom = trackTop + trackH
 
-        canvas.drawRoundRect(0f, trackTop, w, trackBottom, 4f, 4f, trackPaint)
+        drawThumbnails(canvas, trackTop, trackBottom)
 
         if (durationMs > 0) {
             val startX = (startMs.toFloat() / durationMs) * w
             val endX = (endMs.toFloat() / durationMs) * w
+
             canvas.drawRect(startX, trackTop, endX, trackBottom, rangePaint)
+
+            canvas.drawLine(startX, trackTop, startX, trackBottom, borderPaint)
+            canvas.drawLine(endX, trackTop, endX, trackBottom, borderPaint)
+            canvas.drawLine(startX, trackTop, endX, trackTop, borderPaint)
+            canvas.drawLine(startX, trackBottom, endX, trackBottom, borderPaint)
 
             drawHandle(canvas, startX, h / 2)
             drawHandle(canvas, endX, h / 2)
+        }
+    }
+
+    private fun drawThumbnails(canvas: Canvas, top: Float, bottom: Float) {
+        val w = width.toFloat()
+        if (thumbnails.isEmpty() || w <= 0) return
+        val count = thumbnailCount.coerceIn(1, thumbnails.size)
+        val cellW = w / count
+        for (i in 0 until count) {
+            val bmp = thumbnails[i % thumbnails.size]
+            thumbSrcRect.set(0f, 0f, bmp.width.toFloat(), bmp.height.toFloat())
+            thumbDstRect.set(i * cellW, top, (i + 1) * cellW, bottom)
+            canvas.drawBitmap(bmp, null, thumbDstRect, null)
         }
     }
 
@@ -92,15 +127,41 @@ class TrimRangeView @JvmOverloads constructor(
         val w = width.toFloat()
         val startX = (startMs.toFloat() / durationMs) * w
         val endX = (endMs.toFloat() / durationMs) * w
+        val h = height.toFloat()
+        val trackTop = (h - thumbnailHeight) / 2f
+        val trackBottom = trackTop + thumbnailHeight
 
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
-                val distStart = Math.hypot((x - startX).toDouble(), (event.y - height / 2f).toDouble())
-                val distEnd = Math.hypot((x - endX).toDouble(), (event.y - height / 2f).toDouble())
+                val distStart = Math.hypot((x - startX).toDouble(), (event.y - h / 2).toDouble())
+                val distEnd = Math.hypot((x - endX).toDouble(), (event.y - h / 2).toDouble())
                 dragging = when {
                     distStart < handleRadius * 2 -> DRAG_START
                     distEnd < handleRadius * 2 -> DRAG_END
+                    event.y in trackTop..trackBottom -> {
+                        val ratio = (x / w).coerceIn(0f, 1f)
+                        val t = (ratio * durationMs).toLong()
+                        val distStart2 = Math.abs(t - startMs)
+                        val distEnd2 = Math.abs(t - endMs)
+                        if (distStart2 <= distEnd2) DRAG_START else DRAG_END
+                    }
                     else -> DRAG_NONE
+                }
+                if (dragging != DRAG_NONE) {
+                    val ratio = (x / w).coerceIn(0f, 1f)
+                    val timeAtPos = (ratio * durationMs).toLong()
+                    when (dragging) {
+                        DRAG_START -> {
+                            startMs = timeAtPos.coerceIn(0, endMs - 100)
+                            onSeeking?.invoke(startMs)
+                        }
+                        DRAG_END -> {
+                            endMs = timeAtPos.coerceIn(startMs + 100, durationMs)
+                            onSeeking?.invoke(endMs)
+                        }
+                    }
+                    onRangeChanged?.invoke(startMs, endMs)
+                    invalidate()
                 }
                 return dragging != DRAG_NONE
             }
