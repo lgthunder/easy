@@ -32,7 +32,7 @@ class VideoEditActivity : AppCompatActivity() {
     private var originalEnd: Long = 0
     private var sourcePath: String = ""
 
-    private val thumbnailThCount = 20
+    private val thumbnailThCount = 15
     private val thumbnailHeightDp = 60
 
     private val positionHandler = Handler(Looper.getMainLooper())

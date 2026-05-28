@@ -129,11 +129,21 @@ class TrimRangeView @JvmOverloads constructor(
         val cellH = bottom - top
         for (i in 0 until count) {
             val bmp = thumbnails[i % thumbnails.size]
-            thumbSrcRect.set(0f, 0f, bmp.width.toFloat(), bmp.height.toFloat())
+            val cellLeft = i * cellW
+            val cellRight = (i + 1) * cellW
+
+            canvas.save()
+            canvas.clipRect(cellLeft, top, cellRight, bottom)
+
             val dstW = (bmp.width.toFloat() / bmp.height.toFloat()) * cellH
-            val cellCenter = i * cellW + cellW / 2f
-            thumbDstRect.set(cellCenter - dstW / 2f, top, cellCenter + dstW / 2f, bottom)
+            val dstH = cellH
+            val dstCenter = cellLeft + cellW / 2f
+            thumbDstRect.set(dstCenter - dstW / 2f, top, dstCenter + dstW / 2f, top + dstH)
+
+            thumbSrcRect.set(0f, 0f, bmp.width.toFloat(), bmp.height.toFloat())
             canvas.drawBitmap(bmp, thumbSrcRect.toRect(), thumbDstRect, null)
+
+            canvas.restore()
         }
     }
 
