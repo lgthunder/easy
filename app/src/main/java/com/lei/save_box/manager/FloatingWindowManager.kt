@@ -12,7 +12,8 @@ import kotlin.math.sqrt
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
-import coil.load
+import com.bumptech.glide.Glide
+import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.lei.save_box.VideoEditActivity
 import com.lei.save_box.view.FloatingWindowView
 import java.io.File
@@ -37,8 +38,11 @@ class FloatingWindowManager(
 
         val imageView = ImageView(context).apply {
             scaleType = ImageView.ScaleType.FIT_CENTER
-            load(file)
         }
+        Glide.with(context)
+            .load(file)
+            .diskCacheStrategy(DiskCacheStrategy.ALL)
+            .into(imageView)
         window.setContent(imageView)
 
         window.setOnCloseListener {

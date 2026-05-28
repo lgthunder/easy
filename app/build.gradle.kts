@@ -3,6 +3,7 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    id("org.jetbrains.kotlin.kapt")
 }
 
 val keystorePropertiesFile = rootProject.file("keystore.properties")
@@ -72,7 +73,8 @@ dependencies {
     implementation(libs.material)
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.biometric)
-    implementation(libs.coil)
+    implementation(libs.glide.library)
+kapt(libs.glide.compiler)
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.ui)
     implementation(libs.androidx.lifecycle.runtime.ktx)

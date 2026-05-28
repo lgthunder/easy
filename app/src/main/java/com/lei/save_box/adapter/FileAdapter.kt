@@ -5,12 +5,16 @@ import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
-import coil.load
+import com.bumptech.glide.Glide
+import com.bumptech.glide.load.engine.DiskCacheStrategy
+import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
+import com.bumptech.glide.signature.ObjectKey
 import com.lei.save_box.databinding.ItemFileBinding
 import com.lei.save_box.model.FileItem
 import java.io.File
@@ -84,13 +88,16 @@ class FileAdapter(
             val file = File(item.path)
             when {
                 item.isImage -> {
-                    binding.ivFileIcon.load(file) {
-                        size(96, 96)
-                        crossfade(true)
-                    }
+                    Glide.with(binding.ivFileIcon.context)
+                        .load(file)
+                        .override(96, 96)
+                        .transition(DrawableTransitionOptions.withCrossFade())
+                        .diskCacheStrategy(DiskCacheStrategy.ALL)
+                        .into(binding.ivFileIcon)
                 }
                 item.isVideo -> {
-                    loadVideoThumbnail(file)
+                    binding.ivFileIcon.setImageResource(android.R.drawable.ic_media_play)
+                    loadVideoThumbnail(item.path)
                 }
                 else -> {
                     val iconRes = when {
@@ -126,12 +133,19 @@ class FileAdapter(
             }
         }
 
-        private fun loadVideoThumbnail(file: File) {
-            binding.ivFileIcon.setImageResource(android.R.drawable.ic_media_play)
-            val targetPath = file.absolutePath
+        private fun loadVideoThumbnail(filePath: String) {
+            val targetPath = filePath
             thumbnailExecutor.execute {
+                val cachedBitmap = getCachedThumbnail(targetPath)
+                if (cachedBitmap != null) {
+                    Log.d("leiting","缓存命中 $filePath")
+                    updateThumbnail(cachedBitmap, targetPath)
+                    return@execute
+                }
+
                 val retriever = MediaMetadataRetriever()
                 try {
+                    Log.d("leiting","缓存未命中  retriever  $filePath")
                     retriever.setDataSource(targetPath)
                     val embedded = retriever.embeddedPicture
                     val rawBitmap = if (embedded != null) {
@@ -142,23 +156,54 @@ class FileAdapter(
                     val result: Any = if (rawBitmap != null) {
                         val thumb = Bitmap.createScaledBitmap(rawBitmap, 128, 128, true)
                         if (thumb !== rawBitmap) rawBitmap.recycle()
+                        cacheThumbnail(targetPath, thumb)
                         thumb
                     } else {
                         -1
                     }
-                    mainHandler.post {
-                        if (bindingAdapterPosition != RecyclerView.NO_POSITION) {
-                            val currentItem = getItem(bindingAdapterPosition)
-                            if (currentItem.path == targetPath) {
-                                if (result is Bitmap) {
-                                    binding.ivFileIcon.setImageBitmap(result)
-                                }
-                            }
-                        }
-                    }
+                    updateThumbnail(result, targetPath)
                 } catch (_: Exception) {
                 } finally {
                     try { retriever.release() } catch (_: Exception) {}
+                }
+            }
+        }
+
+        private fun getCachedThumbnail(filePath: String): Bitmap? {
+            return try {
+                Glide.with(binding.ivFileIcon.context)
+                    .asBitmap()
+                    .load(File(filePath))
+                    .signature(ObjectKey(filePath))
+                    .diskCacheStrategy(DiskCacheStrategy.ALL)
+                    .submit()
+                    .get()
+            } catch (_: Exception) {
+                null
+            }
+        }
+
+        private fun cacheThumbnail(filePath: String, bitmap: Bitmap) {
+            try {
+                Glide.with(binding.ivFileIcon.context)
+                    .asBitmap()
+                    .load(bitmap)
+                    .signature(ObjectKey(filePath))
+                    .diskCacheStrategy(DiskCacheStrategy.ALL)
+                    .preload(128, 128)
+            } catch (_: Exception) {
+            }
+        }
+
+        private fun updateThumbnail(result: Any, targetPath: String) {
+            mainHandler.post {
+                if (bindingAdapterPosition != RecyclerView.NO_POSITION) {
+                    val currentItem = getItem(bindingAdapterPosition)
+                    if (currentItem.path == targetPath) {
+                        if (result is Bitmap) {
+                            binding.ivFileIcon.setImageBitmap(result)
+                        }
+                    }
                 }
             }
         }
