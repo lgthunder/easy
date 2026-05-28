@@ -27,6 +27,7 @@ media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", versi
 media3-ui = { group = "androidx.media3", name = "media3-ui", version.ref = "media3" }
 media3-transformer = { group = "androidx.media3", name = "media3-transformer", version.ref = "media3" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
+androidx-lifecycle-process = { group = "androidx.lifecycle", name = "lifecycle-process", version.ref = "lifecycleRuntimeKtx" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

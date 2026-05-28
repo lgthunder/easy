@@ -32,7 +32,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-class VaultActivity : AppCompatActivity() {
+class VaultActivity : AppCompatActivity(), LockableActivity {
 
     private lateinit var binding: ActivityVaultBinding
     private lateinit var fileManager: FileManager
@@ -40,7 +40,6 @@ class VaultActivity : AppCompatActivity() {
     private lateinit var floatingWindowManager: FloatingWindowManager
     private lateinit var adapter: FileAdapter
     private var currentSortMode = SortMode.DATE_DESC
-    private var pauseTimestamp = 0L
     private var taskFloatingWindow: TaskFloatingWindow? = null
 
     private val imagePickerLauncher = registerForActivityResult(
@@ -77,8 +76,6 @@ class VaultActivity : AppCompatActivity() {
         fileManager = FileManager(this)
         settingsManager = SettingsManager(this)
         floatingWindowManager = FloatingWindowManager(this, binding.floatingContainer)
-
-        BackgroundTaskManager.init(application)
 
         setupRecyclerView()
         setupFabs()
@@ -344,30 +341,20 @@ class VaultActivity : AppCompatActivity() {
         }
     }
 
-    override fun onPause() {
-        super.onPause()
-        pauseTimestamp = System.currentTimeMillis()
-    }
-
     override fun onResume() {
         super.onResume()
-        if (pauseTimestamp > 0 && System.currentTimeMillis() - pauseTimestamp > 30_000) {
-            floatingWindowManager.closeAll()
-            taskFloatingWindow?.destroy()
-            taskFloatingWindow = null
-            finishAffinity()
-            val intent = Intent(this, FakeHomeActivity::class.java)
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-            startActivity(intent)
-        } else if (pauseTimestamp > 0) {
-            loadFiles()
-            ensureTaskFloatingWindow()
-        }
-        pauseTimestamp = -1
+        loadFiles()
+        ensureTaskFloatingWindow()
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        floatingWindowManager.closeAll()
+        taskFloatingWindow?.destroy()
+        taskFloatingWindow = null
+    }
+
+    override fun onAppLockCleanup() {
         floatingWindowManager.closeAll()
         taskFloatingWindow?.destroy()
         taskFloatingWindow = null

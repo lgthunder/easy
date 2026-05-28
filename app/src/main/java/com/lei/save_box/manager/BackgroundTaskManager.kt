@@ -251,4 +251,9 @@ class BackgroundTaskManager private constructor(private val app: Application) {
     private fun cleanupOutput(outputPath: String) {
         try { File(outputPath).delete() } catch (_: Exception) {}
     }
+
+    fun cancelAllProcessing() {
+        _tasks.filter { it.status == TaskStatus.PROCESSING || it.status == TaskStatus.PENDING }
+            .forEach { cancelFlags[it.id]?.set(true) }
+    }
 }

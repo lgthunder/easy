@@ -30,8 +30,8 @@ android {
         applicationId = "com.lei.save_box"
         minSdk = 30
         targetSdk = 34
-        versionCode = 10002
-        versionName = "1.0.2"
+        versionCode = 10004
+        versionName = "1.0.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -76,6 +76,7 @@ dependencies {
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.ui)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.process)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
