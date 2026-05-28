@@ -14,14 +14,8 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.SeekParameters
-import com.bumptech.glide.Glide
-import com.bumptech.glide.load.DataSource
-import com.bumptech.glide.load.engine.DiskCacheStrategy
-import com.bumptech.glide.load.engine.GlideException
-import com.bumptech.glide.request.RequestListener
-import com.bumptech.glide.request.target.Target
 import com.lei.save_box.databinding.ActivityVideoEditBinding
-import com.lei.save_box.glide.VideoThumbnail
+import com.lei.save_box.glide.VideoFrameCache
 import com.lei.save_box.manager.BackgroundTaskManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -130,29 +124,30 @@ class VideoEditActivity : AppCompatActivity() {
 
         lifecycleScope.launch(Dispatchers.IO) {
             val thumbs = mutableListOf<Bitmap>()
-            val retriever = MediaMetadataRetriever()
-            try {
-                retriever.setDataSource(file.absolutePath)
-                for (i in 0 until count) {
-                    val timeUs = (interval * i + interval / 2) * 1000L
-                    val bmp = retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-                    if (bmp != null) {
-                        val thumbH = (thumbnailHeightDp * resources.displayMetrics.density * 2).toInt()
-                        val thumbW = (bmp.width.toFloat() / bmp.height * thumbH).toInt().coerceAtLeast(1)
-                        val scaled = Bitmap.createScaledBitmap(bmp, thumbW, thumbH, true)
-                        if (scaled !== bmp) bmp.recycle()
-                        thumbs.add(scaled)
-                    }
+            val thumbH = (thumbnailHeightDp * resources.displayMetrics.density * 2).toInt()
+            val thumbW = (thumbnailHeightDp * resources.displayMetrics.density * 2).toInt()
+
+            for (i in 0 until count) {
+                val timeMs = (interval * i + interval / 2)
+                val bitmap = VideoFrameCache.extractAndCache(
+                    this@VideoEditActivity,
+                    file.absolutePath,
+                    timeMs,
+                    thumbW,
+                    thumbH
+                )
+                if (bitmap != null) {
+                    thumbs.add(bitmap)
                 }
-            } catch (_: Exception) {
-            } finally {
-                try { retriever.release() } catch (_: Exception) {}
             }
+
             withContext(Dispatchers.Main) {
                 binding.trimRangeView.setThumbnails(thumbs)
             }
         }
     }
+
+
 
 
     private fun setupButtons() {

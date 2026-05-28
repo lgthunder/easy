@@ -24,8 +24,10 @@ class VideoThumbnailLoader : ModelLoader<VideoThumbnail, Bitmap> {
         height: Int,
         options: Options
     ): ModelLoader.LoadData<Bitmap> {
+        val cacheKey = "${model.filePath}_${model.time}"
+        Log.d("leiting", "VideoThumbnailLoader: buildLoadData cacheKey=$cacheKey")
         return ModelLoader.LoadData(
-            com.bumptech.glide.signature.ObjectKey(model.filePath+"_${model.time}"),
+            com.bumptech.glide.signature.ObjectKey(cacheKey),
             VideoThumbnailDataFetcher(model, width, height)
         )
     }
@@ -46,7 +48,7 @@ class VideoThumbnailDataFetcher(
 ) : DataFetcher<Bitmap> {
 
     override fun loadData(priority: com.bumptech.glide.Priority, callback: DataFetcher.DataCallback<in Bitmap>) {
-        Log.d("leiting", "VideoThumbnailDataFetcher: 开始加载 ${model.filePath}")
+        Log.d("leiting", "VideoThumbnailDataFetcher: loadData 被调用 filePath=${model.filePath} time=${model.time}")
         val file = File(model.filePath)
         if (!file.exists()) {
             Log.d("leiting", "VideoThumbnailDataFetcher: 文件不存在 ${model.filePath}")
@@ -57,21 +59,21 @@ class VideoThumbnailDataFetcher(
         val retriever = MediaMetadataRetriever()
         try {
             retriever.setDataSource(model.filePath)
-            Log.d("leiting", "VideoThumbnailDataFetcher: 提取帧 ${model.filePath}")
+            Log.d("leiting", "VideoThumbnailDataFetcher: 开始提取帧 time=${model.time} ${model.filePath}")
 
             val embedded = retriever.embeddedPicture
             val rawBitmap = if (embedded != null) {
                 Log.d("leiting", "VideoThumbnailDataFetcher: 使用内嵌封面")
                 BitmapFactory.decodeByteArray(embedded, 0, embedded.size)
             } else {
-                Log.d("leiting", "VideoThumbnailDataFetcher: 提取非黑屏帧")
-                extractNonBlackFrame(retriever,model.time)
+                Log.d("leiting", "VideoThumbnailDataFetcher: 提取非黑屏帧 time=${model.time}")
+                extractNonBlackFrame(retriever, model.time)
             }
 
             if (rawBitmap != null) {
                 val scaled = Bitmap.createScaledBitmap(rawBitmap, width.coerceAtLeast(96), height.coerceAtLeast(96), true)
                 if (scaled !== rawBitmap) rawBitmap.recycle()
-                Log.d("leiting", "VideoThumbnailDataFetcher: 成功 ${model.filePath}")
+                Log.d("leiting", "VideoThumbnailDataFetcher: 提取成功，存入缓存 filePath=${model.filePath} time=${model.time}")
                 callback.onDataReady(scaled)
             } else {
                 Log.d("leiting", "VideoThumbnailDataFetcher: 提取失败 ${model.filePath}")
@@ -85,8 +87,11 @@ class VideoThumbnailDataFetcher(
         }
     }
 
-    private fun extractNonBlackFrame(retriever: MediaMetadataRetriever,time:Long): Bitmap? {
-        val offsets = longArrayOf(time*1000,1_000_000, 500_000, 2_000_000, 10_000_000, 0)
+    private fun extractNonBlackFrame(retriever: MediaMetadataRetriever, time: Long): Bitmap? {
+        val offsets = mutableListOf<Long>()
+        if (time > 0) offsets.add(time * 1000)
+        offsets.addAll(listOf(1_000_000L, 500_000L, 2_000_000L, 10_000_000L, 0L))
+
         for (offset in offsets) {
             val frame = retriever.getFrameAtTime(offset, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
             if (frame != null && !isMostlyBlack(frame)) return frame
