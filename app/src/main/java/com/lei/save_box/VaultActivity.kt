@@ -19,12 +19,14 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.lei.save_box.adapter.FileAdapter
 import com.lei.save_box.databinding.ActivityVaultBinding
+import com.lei.save_box.manager.BackgroundTaskManager
 import com.lei.save_box.manager.FileManager
 import com.lei.save_box.manager.FloatingWindowManager
 import com.lei.save_box.manager.SettingsManager
 import com.lei.save_box.manager.SortMode
 import com.lei.save_box.model.FileItem
 import com.lei.save_box.view.ProgressDialogHelper
+import com.lei.save_box.view.TaskFloatingWindow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -39,6 +41,7 @@ class VaultActivity : AppCompatActivity() {
     private lateinit var adapter: FileAdapter
     private var currentSortMode = SortMode.DATE_DESC
     private var pauseTimestamp = 0L
+    private var taskFloatingWindow: TaskFloatingWindow? = null
 
     private val imagePickerLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -74,6 +77,8 @@ class VaultActivity : AppCompatActivity() {
         fileManager = FileManager(this)
         settingsManager = SettingsManager(this)
         floatingWindowManager = FloatingWindowManager(this, binding.floatingContainer)
+
+        BackgroundTaskManager.init(application)
 
         setupRecyclerView()
         setupFabs()
@@ -348,12 +353,15 @@ class VaultActivity : AppCompatActivity() {
         super.onResume()
         if (pauseTimestamp > 0 && System.currentTimeMillis() - pauseTimestamp > 30_000) {
             floatingWindowManager.closeAll()
+            taskFloatingWindow?.destroy()
+            taskFloatingWindow = null
             finishAffinity()
             val intent = Intent(this, FakeHomeActivity::class.java)
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
             startActivity(intent)
         } else if (pauseTimestamp > 0) {
             loadFiles()
+            ensureTaskFloatingWindow()
         }
         pauseTimestamp = -1
     }
@@ -361,5 +369,18 @@ class VaultActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         floatingWindowManager.closeAll()
+        taskFloatingWindow?.destroy()
+        taskFloatingWindow = null
+    }
+
+    private fun ensureTaskFloatingWindow() {
+        if (taskFloatingWindow == null) {
+            taskFloatingWindow = TaskFloatingWindow(this)
+            taskFloatingWindow?.attachTo(binding.floatTask)
+        }
+        val manager = BackgroundTaskManager.getInstance()
+//        if (manager.activeCount > 0 || manager.tasks.isNotEmpty()) {
+            taskFloatingWindow?.show()
+//        }
     }
 }

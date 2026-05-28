@@ -1,11 +1,7 @@
 package com.lei.save_box
 
 import android.graphics.Bitmap
-import android.media.MediaCodec
-import android.media.MediaExtractor
-import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
-import android.media.MediaMuxer
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -16,13 +12,11 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import com.lei.save_box.databinding.ActivityVideoEditBinding
-import com.lei.save_box.manager.FileManager
-import com.lei.save_box.view.ProgressDialogHelper
+import com.lei.save_box.manager.BackgroundTaskManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.nio.ByteBuffer
 
 class VideoEditActivity : AppCompatActivity() {
 
@@ -196,123 +190,12 @@ class VideoEditActivity : AppCompatActivity() {
         val p = player
         p?.pause()
 
-        val helper = ProgressDialogHelper(this)
         val sourceFile = File(sourcePath)
         val sourceName = sourceFile.nameWithoutExtension
-        val outputDir = FileManager(this).vaultDir
-        val timestamp = System.currentTimeMillis()
-        val outputFile = File(outputDir, "edited_${sourceName}_${timestamp}.mp4")
 
-        helper.show(getString(R.string.trimming_video), 100)
+        BackgroundTaskManager.getInstance().addTask(sourcePath, startMs, endMs, sourceName)
 
-        lifecycleScope.launch(Dispatchers.IO) {
-            try {
-                val mainHandler = Handler(Looper.getMainLooper())
-                trimWithMediaExtractor(sourceFile, outputFile, startMs * 1000L, endMs * 1000L) { progress ->
-                    mainHandler.post {
-                        helper.updateProgress(progress, "")
-                    }
-                }
-                withContext(Dispatchers.Main) {
-                    helper.dismiss()
-                    Toast.makeText(this@VideoEditActivity, R.string.trim_success, Toast.LENGTH_SHORT).show()
-                    finish()
-                }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    helper.dismiss()
-                    Toast.makeText(this@VideoEditActivity, "裁剪失败: ${e.message}", Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
-    }
-
-    private fun trimWithMediaExtractor(
-        sourceFile: File,
-        outputFile: File,
-        startUs: Long,
-        endUs: Long,
-        onProgress: (Int) -> Unit
-    ) {
-        val extractor = MediaExtractor()
-        var muxer: MediaMuxer? = null
-        try {
-            extractor.setDataSource(sourceFile.absolutePath)
-
-            muxer = MediaMuxer(outputFile.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
-            muxer.setOrientationHint(0)
-
-            val trackCount = extractor.trackCount
-            val muxerTrackIndices = IntArray(trackCount) { -1 }
-            var sampleBuffer = ByteBuffer.allocate(2 * 1024 * 1024)
-            val bufferInfo = MediaCodec.BufferInfo()
-            val totalDurationUs = endUs - startUs
-
-            for (i in 0 until trackCount) {
-                val format = extractor.getTrackFormat(i)
-                val mime = format.getString(MediaFormat.KEY_MIME) ?: continue
-                if (mime.startsWith("video/") || mime.startsWith("audio/")) {
-                    muxerTrackIndices[i] = muxer.addTrack(format)
-                    extractor.selectTrack(i)
-                }
-            }
-
-            if (muxerTrackIndices.all { it < 0 }) {
-                throw RuntimeException("No video or audio tracks found")
-            }
-
-            muxer.start()
-
-            val videoTrackIndex = (0 until trackCount).firstOrNull { i ->
-                extractor.getTrackFormat(i).getString(MediaFormat.KEY_MIME)?.startsWith("video/") == true
-            }
-            if (videoTrackIndex != null) {
-                extractor.seekTo(startUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
-            }
-
-            var lastProgress = -1
-            var firstSample = true
-            while (true) {
-                val sampleTime = extractor.sampleTime
-                if (sampleTime < 0 || sampleTime >= endUs) break
-
-                val trackIndex = extractor.sampleTrackIndex
-                if (muxerTrackIndices[trackIndex] >= 0) {
-                    sampleBuffer.clear()
-                    var sampleSize = extractor.readSampleData(sampleBuffer, 0)
-                    if (sampleSize < 0) {
-                        sampleBuffer = ByteBuffer.allocate(-sampleSize)
-                        sampleSize = extractor.readSampleData(sampleBuffer, 0)
-                    }
-                    if (sampleSize >= 0) {
-                        val pts = if (firstSample) 0L else (sampleTime - startUs).coerceAtLeast(0)
-                        bufferInfo.apply {
-                            offset = 0
-                            size = sampleSize
-                            presentationTimeUs = pts
-                            flags = extractor.sampleFlags
-                        }
-                        muxer.writeSampleData(muxerTrackIndices[trackIndex], sampleBuffer, bufferInfo)
-                    }
-                }
-
-                if (sampleTime >= startUs) {
-                    firstSample = false
-                    val progress = ((sampleTime - startUs).toFloat() / totalDurationUs * 100).toInt()
-                    if (progress != lastProgress) {
-                        lastProgress = progress
-                        onProgress(progress.coerceIn(0, 99))
-                    }
-                }
-
-                if (!extractor.advance()) break
-            }
-            onProgress(100)
-        } finally {
-            try { muxer?.stop() } catch (_: Exception) {}
-            try { muxer?.release() } catch (_: Exception) {}
-            try { extractor.release() } catch (_: Exception) {}
-        }
+        Toast.makeText(this, "已添加到后台任务", Toast.LENGTH_SHORT).show()
     }
 
     override fun onDestroy() {
