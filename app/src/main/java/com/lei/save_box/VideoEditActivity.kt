@@ -1,18 +1,20 @@
 package com.lei.save_box
 
 import android.graphics.Bitmap
+import android.media.MediaCodec
+import android.media.MediaExtractor
+import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
+import android.media.MediaMuxer
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.transformer.Transformer
 import com.lei.save_box.databinding.ActivityVideoEditBinding
 import com.lei.save_box.manager.FileManager
 import com.lei.save_box.view.ProgressDialogHelper
@@ -20,6 +22,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.nio.ByteBuffer
 
 class VideoEditActivity : AppCompatActivity() {
 
@@ -202,30 +205,13 @@ class VideoEditActivity : AppCompatActivity() {
 
         helper.show(getString(R.string.trimming_video), 100)
 
-        val transformer = Transformer.Builder(this).build()
-        val mediaItem = MediaItem.Builder()
-            .setUri(sourceFile.toURI().toString())
-            .setClippingConfiguration(
-                MediaItem.ClippingConfiguration.Builder()
-                    .setStartPositionMs(startMs)
-                    .setEndPositionMs(endMs)
-                    .build()
-            )
-            .build()
-
-        transformer.start(mediaItem, outputFile.absolutePath)
-
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                while (true) {
-                    kotlinx.coroutines.delay(300)
-                    if (!outputFile.exists()) continue
-                    val size = outputFile.length()
-                    kotlinx.coroutines.delay(300)
-                    withContext(Dispatchers.Main) {
-                        helper.updateProgress((outputFile.length()*100f / size).toInt(),"")
+                val mainHandler = Handler(Looper.getMainLooper())
+                trimWithMediaExtractor(sourceFile, outputFile, startMs * 1000L, endMs * 1000L) { progress ->
+                    mainHandler.post {
+                        helper.updateProgress(progress, "")
                     }
-                    if (outputFile.length() == size && size > 0) break
                 }
                 withContext(Dispatchers.Main) {
                     helper.dismiss()
@@ -238,6 +224,94 @@ class VideoEditActivity : AppCompatActivity() {
                     Toast.makeText(this@VideoEditActivity, "裁剪失败: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
             }
+        }
+    }
+
+    private fun trimWithMediaExtractor(
+        sourceFile: File,
+        outputFile: File,
+        startUs: Long,
+        endUs: Long,
+        onProgress: (Int) -> Unit
+    ) {
+        val extractor = MediaExtractor()
+        var muxer: MediaMuxer? = null
+        try {
+            extractor.setDataSource(sourceFile.absolutePath)
+
+            muxer = MediaMuxer(outputFile.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+            muxer.setOrientationHint(0)
+
+            val trackCount = extractor.trackCount
+            val muxerTrackIndices = IntArray(trackCount) { -1 }
+            var sampleBuffer = ByteBuffer.allocate(2 * 1024 * 1024)
+            val bufferInfo = MediaCodec.BufferInfo()
+            val totalDurationUs = endUs - startUs
+
+            for (i in 0 until trackCount) {
+                val format = extractor.getTrackFormat(i)
+                val mime = format.getString(MediaFormat.KEY_MIME) ?: continue
+                if (mime.startsWith("video/") || mime.startsWith("audio/")) {
+                    muxerTrackIndices[i] = muxer.addTrack(format)
+                    extractor.selectTrack(i)
+                }
+            }
+
+            if (muxerTrackIndices.all { it < 0 }) {
+                throw RuntimeException("No video or audio tracks found")
+            }
+
+            muxer.start()
+
+            val videoTrackIndex = (0 until trackCount).firstOrNull { i ->
+                extractor.getTrackFormat(i).getString(MediaFormat.KEY_MIME)?.startsWith("video/") == true
+            }
+            if (videoTrackIndex != null) {
+                extractor.seekTo(startUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
+            }
+
+            var lastProgress = -1
+            var firstSample = true
+            while (true) {
+                val sampleTime = extractor.sampleTime
+                if (sampleTime < 0 || sampleTime >= endUs) break
+
+                val trackIndex = extractor.sampleTrackIndex
+                if (muxerTrackIndices[trackIndex] >= 0) {
+                    sampleBuffer.clear()
+                    var sampleSize = extractor.readSampleData(sampleBuffer, 0)
+                    if (sampleSize < 0) {
+                        sampleBuffer = ByteBuffer.allocate(-sampleSize)
+                        sampleSize = extractor.readSampleData(sampleBuffer, 0)
+                    }
+                    if (sampleSize >= 0) {
+                        val pts = if (firstSample) 0L else (sampleTime - startUs).coerceAtLeast(0)
+                        bufferInfo.apply {
+                            offset = 0
+                            size = sampleSize
+                            presentationTimeUs = pts
+                            flags = extractor.sampleFlags
+                        }
+                        muxer.writeSampleData(muxerTrackIndices[trackIndex], sampleBuffer, bufferInfo)
+                    }
+                }
+
+                if (sampleTime >= startUs) {
+                    firstSample = false
+                    val progress = ((sampleTime - startUs).toFloat() / totalDurationUs * 100).toInt()
+                    if (progress != lastProgress) {
+                        lastProgress = progress
+                        onProgress(progress.coerceIn(0, 99))
+                    }
+                }
+
+                if (!extractor.advance()) break
+            }
+            onProgress(100)
+        } finally {
+            try { muxer?.stop() } catch (_: Exception) {}
+            try { muxer?.release() } catch (_: Exception) {}
+            try { extractor.release() } catch (_: Exception) {}
         }
     }
 
