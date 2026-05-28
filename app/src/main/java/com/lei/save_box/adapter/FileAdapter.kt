@@ -89,7 +89,7 @@ class FileAdapter(
                 item.isVideo -> {
                     Glide.with(binding.ivFileIcon.context)
                         .asBitmap()
-                        .load(VideoThumbnail(item.path,4000))
+                        .load(VideoThumbnail(item.path,0))
                         .override(96, 96)
                         .placeholder(android.R.drawable.ic_media_play)
                         .error(android.R.drawable.ic_media_play)

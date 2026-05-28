@@ -14,7 +14,14 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.SeekParameters
+import com.bumptech.glide.Glide
+import com.bumptech.glide.load.DataSource
+import com.bumptech.glide.load.engine.DiskCacheStrategy
+import com.bumptech.glide.load.engine.GlideException
+import com.bumptech.glide.request.RequestListener
+import com.bumptech.glide.request.target.Target
 import com.lei.save_box.databinding.ActivityVideoEditBinding
+import com.lei.save_box.glide.VideoThumbnail
 import com.lei.save_box.manager.BackgroundTaskManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -146,6 +153,7 @@ class VideoEditActivity : AppCompatActivity() {
             }
         }
     }
+
 
     private fun setupButtons() {
         binding.trimRangeView.onSeeking = { timeMs ->

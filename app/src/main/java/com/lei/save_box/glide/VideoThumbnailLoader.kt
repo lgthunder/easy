@@ -25,7 +25,7 @@ class VideoThumbnailLoader : ModelLoader<VideoThumbnail, Bitmap> {
         options: Options
     ): ModelLoader.LoadData<Bitmap> {
         return ModelLoader.LoadData(
-            com.bumptech.glide.signature.ObjectKey(model.filePath),
+            com.bumptech.glide.signature.ObjectKey(model.filePath+"_${model.time}"),
             VideoThumbnailDataFetcher(model, width, height)
         )
     }
