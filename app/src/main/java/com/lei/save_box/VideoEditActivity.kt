@@ -5,6 +5,8 @@ import android.media.MediaMetadataRetriever
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
+import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -28,6 +30,13 @@ class VideoEditActivity : AppCompatActivity() {
 
     private val thumbnailThCount = 15
     private val thumbnailHeightDp = 60
+    lateinit var oriFile :File
+    val retriever = MediaMetadataRetriever()
+
+    private val frameJobQueue = ArrayDeque<kotlinx.coroutines.Job>(8)
+    private val throttleHandler = Handler(Looper.getMainLooper())
+    private var throttleRunnable: Runnable? = null
+    private var lastCallTimeMs: Long = 0
 
     private val positionHandler = Handler(Looper.getMainLooper())
     private val positionUpdater = object : Runnable {
@@ -51,7 +60,7 @@ class VideoEditActivity : AppCompatActivity() {
             finish()
             return
         }
-
+        oriFile = File(sourcePath)
         initPlayer()
         setupButtons()
     }
@@ -101,6 +110,8 @@ class VideoEditActivity : AppCompatActivity() {
                 binding.trimRangeView.currentPositionMs = p.currentPosition
             }
         })
+
+        try { retriever.setDataSource(sourcePath) } catch (_: Exception) {}
     }
 
     private fun generateThumbnails(file: File, durationMs: Long) {
@@ -141,6 +152,19 @@ class VideoEditActivity : AppCompatActivity() {
                 p.pause()
                 p.seekTo(timeMs)
             }
+            val now = System.currentTimeMillis()
+            val elapsed = now - lastCallTimeMs
+            throttleRunnable?.let { throttleHandler.removeCallbacks(it) }
+            if (elapsed >= 100) {
+                getCurrentFrame(timeMs)
+                lastCallTimeMs = now
+            } else {
+                throttleRunnable = Runnable {
+                    getCurrentFrame(timeMs)
+                    lastCallTimeMs = System.currentTimeMillis()
+                }
+                throttleHandler.postDelayed(throttleRunnable!!, 100)
+            }
         }
 
         binding.trimRangeView.onRangeChanged = { _, _ ->
@@ -158,6 +182,7 @@ class VideoEditActivity : AppCompatActivity() {
                     p.seekTo(start)
                 }
                 p.play()
+                binding.videoCover.visibility = View.GONE
             }
         }
 
@@ -171,6 +196,30 @@ class VideoEditActivity : AppCompatActivity() {
 
         binding.btnSave.setOnClickListener {
             saveTrimmedVideo()
+        }
+    }
+
+
+    private fun getCurrentFrame(durationMs: Long) {
+        Log.d("leiting","getCurrentFrame $durationMs")
+        val job = lifecycleScope.launch(Dispatchers.IO) {
+            var bitmap: Bitmap? = null
+            try {
+                bitmap = retriever.getFrameAtTime(durationMs * 1000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                Log.d("leiting","getCurrentFrame excute $durationMs")
+            } catch (_: Exception) {
+            }
+            withContext(Dispatchers.Main) {
+                Log.d("leiting","getCurrentFrame update image $durationMs")
+                bitmap?.let {
+                    binding.videoCover.visibility = View.VISIBLE
+                    binding.videoCover.setImageBitmap(it)
+                }
+            }
+        }
+        frameJobQueue.addLast(job)
+        while (frameJobQueue.size > 3) {
+            frameJobQueue.removeFirst().cancel()
         }
     }
 
@@ -201,8 +250,13 @@ class VideoEditActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         positionHandler.removeCallbacks(positionUpdater)
+        while (frameJobQueue.isNotEmpty()) {
+            frameJobQueue.removeFirst().cancel()
+        }
+        throttleRunnable?.let { throttleHandler.removeCallbacks(it) }
         player?.release()
         player = null
+        retriever.release()
     }
 
     private fun formatMs(ms: Long): String {
