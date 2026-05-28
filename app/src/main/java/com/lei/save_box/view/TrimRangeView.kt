@@ -42,6 +42,11 @@ class TrimRangeView @JvmOverloads constructor(
         style = Paint.Style.STROKE
         strokeWidth = 3f
     }
+    private val positionTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFFFFFFFF.toInt()
+        textSize = 14f
+        textAlign = Paint.Align.CENTER
+    }
     private val thumbSrcRect = RectF()
     private val thumbDstRect = RectF()
 
@@ -76,6 +81,7 @@ class TrimRangeView @JvmOverloads constructor(
         private const val DRAG_NONE = 0
         private const val DRAG_START = 1
         private const val DRAG_END = 2
+        private const val DRAG_POSITION = 3
     }
 
     fun setRange(start: Long, end: Long) {
@@ -94,7 +100,9 @@ class TrimRangeView @JvmOverloads constructor(
         val w = width.toFloat()
         val h = height.toFloat()
         val trackH = thumbnailHeight
-        val trackTop = (h - trackH) / 2f
+        val textHeight = positionTextPaint.descent() - positionTextPaint.ascent()
+        val textMargin = 8f
+        val trackTop = textHeight + textMargin * 2
         val trackBottom = trackTop + trackH
 
         drawThumbnails(canvas, trackTop, trackBottom)
@@ -110,13 +118,29 @@ class TrimRangeView @JvmOverloads constructor(
             canvas.drawLine(startX, trackTop, endX, trackTop, borderPaint)
             canvas.drawLine(startX, trackBottom, endX, trackBottom, borderPaint)
 
-            drawHandle(canvas, startX, h / 2)
-            drawHandle(canvas, endX, h / 2)
+            val trackCenterY = trackTop + trackH / 2
+            drawHandle(canvas, startX, trackCenterY)
+            drawHandle(canvas, endX, trackCenterY)
 
             if (currentPositionMs > 0 && currentPositionMs <= durationMs) {
                 val posX = (currentPositionMs.toFloat() / durationMs) * w
                 canvas.drawLine(posX, trackTop, posX, trackBottom, positionLinePaint)
-                canvas.drawCircle(posX, h / 2, 5f, positionLinePaint)
+                canvas.drawCircle(posX, trackCenterY, 5f, positionLinePaint)
+                
+                val timeText = formatTime(currentPositionMs)
+                val textWidth = positionTextPaint.measureText(timeText)
+                val textY = textHeight + textMargin
+                
+                val bgLeft = posX - textWidth / 2 - 4f
+                val bgRight = posX + textWidth / 2 + 4f
+                val bgTop = textMargin
+                val bgBottom = textHeight + textMargin * 2
+                
+                positionTextPaint.color = 0xCC000000.toInt()
+                canvas.drawRect(bgLeft, bgTop, bgRight, bgBottom, positionTextPaint)
+                
+                positionTextPaint.color = 0xFFFFFFFF.toInt()
+                canvas.drawText(timeText, posX, textY, positionTextPaint)
             }
         }
     }
@@ -166,7 +190,10 @@ class TrimRangeView @JvmOverloads constructor(
             MotionEvent.ACTION_DOWN -> {
                 val distStart = Math.hypot((x - startX).toDouble(), (event.y - h / 2).toDouble())
                 val distEnd = Math.hypot((x - endX).toDouble(), (event.y - h / 2).toDouble())
+                val posX = (currentPositionMs.toFloat() / durationMs) * w
+                val distPos = Math.hypot((x - posX).toDouble(), (event.y - h / 2).toDouble())
                 dragging = when {
+                    distPos < handleRadius * 3 && currentPositionMs > 0 -> DRAG_POSITION
                     distStart < handleRadius * 2 -> DRAG_START
                     distEnd < handleRadius * 2 -> DRAG_END
                     event.y in trackTop..trackBottom -> {
@@ -182,6 +209,10 @@ class TrimRangeView @JvmOverloads constructor(
                     val ratio = (x / w).coerceIn(0f, 1f)
                     val timeAtPos = (ratio * durationMs).toLong()
                     when (dragging) {
+                        DRAG_POSITION -> {
+                            currentPositionMs = timeAtPos.coerceIn(0, durationMs)
+                            onSeeking?.invoke(currentPositionMs)
+                        }
                         DRAG_START -> {
                             startMs = timeAtPos.coerceIn(0, endMs - 100)
                             onSeeking?.invoke(startMs)
@@ -200,6 +231,10 @@ class TrimRangeView @JvmOverloads constructor(
                 val ratio = (x / w).coerceIn(0f, 1f)
                 val timeAtPos = (ratio * durationMs).toLong()
                 when (dragging) {
+                    DRAG_POSITION -> {
+                        currentPositionMs = timeAtPos.coerceIn(0, durationMs)
+                        onSeeking?.invoke(currentPositionMs)
+                    }
                     DRAG_START -> {
                         startMs = timeAtPos.coerceIn(0, endMs - 100)
                         onSeeking?.invoke(startMs)
@@ -216,6 +251,10 @@ class TrimRangeView @JvmOverloads constructor(
                 val ratio = (x / w).coerceIn(0f, 1f)
                 val timeAtPos = (ratio * durationMs).toLong()
                 when (dragging) {
+                    DRAG_POSITION -> {
+                        currentPositionMs = timeAtPos.coerceIn(0, durationMs)
+                        onSeeking?.invoke(currentPositionMs)
+                    }
                     DRAG_START -> {
                         startMs = timeAtPos.coerceIn(0, endMs - 100)
                         onSeeking?.invoke(startMs)
@@ -232,5 +271,12 @@ class TrimRangeView @JvmOverloads constructor(
             }
         }
         return super.onTouchEvent(event)
+    }
+
+    private fun formatTime(ms: Long): String {
+        val totalSec = ms / 1000
+        val min = totalSec / 60
+        val sec = totalSec % 60
+        return "%02d:%02d".format(min, sec)
     }
 }

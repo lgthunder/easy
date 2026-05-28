@@ -94,7 +94,7 @@ class VideoThumbnailDataFetcher(
 
         for (offset in offsets) {
             val frame = retriever.getFrameAtTime(offset, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-            if (frame != null && !isMostlyBlack(frame)) return frame
+            if (frame != null && !isMostlyBlack(frame) && !isMostlyWhite(frame)) return frame
         }
         return retriever.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
     }
@@ -114,6 +114,23 @@ class VideoThumbnailDataFetcher(
             }
         }
         return totalSamples > 0 && darkPixels.toFloat() / totalSamples > 0.8f
+    }
+
+    private fun isMostlyWhite(bitmap: Bitmap): Boolean {
+        val sampleSize = 10
+        var lightPixels = 0
+        var totalSamples = 0
+        for (y in 0 until bitmap.height step sampleSize) {
+            for (x in 0 until bitmap.width step sampleSize) {
+                val pixel = bitmap.getPixel(x, y)
+                val r = (pixel shr 16) and 0xFF
+                val g = (pixel shr 8) and 0xFF
+                val b = pixel and 0xFF
+                if (r > 225 && g > 225 && b > 225) lightPixels++
+                totalSamples++
+            }
+        }
+        return totalSamples > 0 && lightPixels.toFloat() / totalSamples > 0.8f
     }
 
     override fun cleanup() {}

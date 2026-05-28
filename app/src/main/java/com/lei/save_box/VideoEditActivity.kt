@@ -159,7 +159,7 @@ class VideoEditActivity : AppCompatActivity() {
 //                getCurrentFrame(timeMs)
                 binding.trimRangeView.currentPositionMs = timeMs
                 player?.let { p ->
-//                p.pause()
+                    p.pause()
                     p.seekTo(timeMs)
                 }
                 lastCallTimeMs = now
@@ -168,7 +168,7 @@ class VideoEditActivity : AppCompatActivity() {
 //                    getCurrentFrame(timeMs)
                     binding.trimRangeView.currentPositionMs = timeMs
                     player?.let { p ->
-//                p.pause()
+                        p.pause()
                         p.seekTo(timeMs)
                     }
                     lastCallTimeMs = System.currentTimeMillis()
