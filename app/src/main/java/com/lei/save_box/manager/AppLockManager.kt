@@ -52,7 +52,7 @@ class AppLockManager private constructor(private val app: Application) {
                 handler.removeCallbacks(lockRunnable)
             }
             override fun onStop(owner: LifecycleOwner) {
-                handler.postDelayed(lockRunnable, 30_000L)
+                handler.postDelayed(lockRunnable, 15_000L)
             }
         })
     }

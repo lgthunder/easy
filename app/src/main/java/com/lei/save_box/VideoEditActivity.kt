@@ -13,6 +13,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.SeekParameters
 import com.lei.save_box.databinding.ActivityVideoEditBinding
 import com.lei.save_box.manager.BackgroundTaskManager
 import kotlinx.coroutines.Dispatchers
@@ -68,6 +69,7 @@ class VideoEditActivity : AppCompatActivity() {
     private fun initPlayer() {
         val p = ExoPlayer.Builder(this).build()
         player = p
+        player?.setSeekParameters(SeekParameters.CLOSEST_SYNC)
         binding.playerView.player = p
         binding.playerView.useController = false
 
@@ -147,20 +149,25 @@ class VideoEditActivity : AppCompatActivity() {
 
     private fun setupButtons() {
         binding.trimRangeView.onSeeking = { timeMs ->
-            binding.trimRangeView.currentPositionMs = timeMs
-            player?.let { p ->
-                p.pause()
-                p.seekTo(timeMs)
-            }
             val now = System.currentTimeMillis()
             val elapsed = now - lastCallTimeMs
             throttleRunnable?.let { throttleHandler.removeCallbacks(it) }
             if (elapsed >= 100) {
-                getCurrentFrame(timeMs)
+//                getCurrentFrame(timeMs)
+                binding.trimRangeView.currentPositionMs = timeMs
+                player?.let { p ->
+//                p.pause()
+                    p.seekTo(timeMs)
+                }
                 lastCallTimeMs = now
             } else {
                 throttleRunnable = Runnable {
-                    getCurrentFrame(timeMs)
+//                    getCurrentFrame(timeMs)
+                    binding.trimRangeView.currentPositionMs = timeMs
+                    player?.let { p ->
+//                p.pause()
+                        p.seekTo(timeMs)
+                    }
                     lastCallTimeMs = System.currentTimeMillis()
                 }
                 throttleHandler.postDelayed(throttleRunnable!!, 100)

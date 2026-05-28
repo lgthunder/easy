@@ -1,7 +1,10 @@
 package com.lei.save_box
 
+import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -19,6 +22,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.Executor
+
 
 class FakeHomeActivity : AppCompatActivity() {
 
@@ -53,7 +57,29 @@ class FakeHomeActivity : AppCompatActivity() {
                 }
             }
         }
+        binding.version.text = getVersionName(this)
     }
+
+    fun getVersionName(context: Context): String? {
+        try {
+            val pm = context.packageManager
+            val packageInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                // Android 13 (API 33) 及以上使用新 API
+                pm.getPackageInfo(
+                    context.packageName,
+                    PackageManager.PackageInfoFlags.of(0)
+                )
+            } else {
+                // Android 12 (API 32) 及以下使用旧 API，并抑制废弃警告
+                pm.getPackageInfo(context.packageName, 0)
+            }
+            return packageInfo.versionName
+        } catch (e: PackageManager.NameNotFoundException) {
+            e.printStackTrace()
+            return null
+        }
+    }
+
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
