@@ -17,7 +17,8 @@ object VideoFrameCache {
     private const val TAG = "VideoFrameCache"
 
     fun getCacheKey(filePath: String, timeMs: Long): String {
-        return "${filePath}_frame_${timeMs}"
+        var time = (timeMs*1f/1000).toInt()
+        return "${filePath}_frame_${time}"
     }
 
     fun isCached(context: Context, filePath: String, timeMs: Long): Boolean {

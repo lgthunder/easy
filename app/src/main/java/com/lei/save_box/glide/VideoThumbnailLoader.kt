@@ -14,6 +14,11 @@ import java.io.File
 
 class VideoThumbnailLoader : ModelLoader<VideoThumbnail, Bitmap> {
 
+    fun getCacheKey(filePath: String, timeMs: Long): String {
+        var time = (timeMs*1f/1000).toInt()
+        return "${filePath}_frame_${time}"
+    }
+
     override fun handles(model: VideoThumbnail): Boolean {
         return File(model.filePath).exists()
     }
@@ -24,7 +29,7 @@ class VideoThumbnailLoader : ModelLoader<VideoThumbnail, Bitmap> {
         height: Int,
         options: Options
     ): ModelLoader.LoadData<Bitmap> {
-        val cacheKey = "${model.filePath}_${model.time}"
+        val cacheKey = getCacheKey(model.filePath,model.time)
         Log.d("leiting", "VideoThumbnailLoader: buildLoadData cacheKey=$cacheKey")
         return ModelLoader.LoadData(
             com.bumptech.glide.signature.ObjectKey(cacheKey),

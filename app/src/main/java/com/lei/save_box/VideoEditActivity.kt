@@ -21,6 +21,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import kotlin.math.log
 
 class VideoEditActivity : AppCompatActivity() {
 
@@ -157,6 +158,7 @@ class VideoEditActivity : AppCompatActivity() {
     }
 
     private fun generateThumbnailsForRange(file: File, startMs: Long, endMs: Long, thumbCount: Int) {
+        Log.d("leiting","generateThumbnailsForRange  startMs $startMs  endMs $endMs thumbCount $thumbCount")
         val rangeDuration = endMs - startMs
         val interval = rangeDuration / thumbCount
         if (interval <= 0) return
@@ -181,6 +183,7 @@ class VideoEditActivity : AppCompatActivity() {
             }
 
             withContext(Dispatchers.Main) {
+                Log.d("leiting","generateThumbnailsForRange finish  startMs $startMs  endMs $endMs thumbCount $thumbCount")
                 binding.trimRangeView.setThumbnails(thumbs)
             }
         }
@@ -255,7 +258,7 @@ class VideoEditActivity : AppCompatActivity() {
                 if (startMs == 0L && endMs == totalDuration) {
                     generateThumbnails(videoFile, totalDuration)
                 } else {
-                    val thumbCount = (binding.trimRangeView.width / 6).coerceIn(20, 80)
+                    val thumbCount = (binding.trimRangeView.width / 6).coerceIn(2, 10)
                     generateThumbnailsForRange(videoFile, startMs, endMs, thumbCount)
                 }
             }
