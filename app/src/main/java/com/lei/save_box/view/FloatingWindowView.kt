@@ -60,6 +60,7 @@ class FloatingWindowView @JvmOverloads constructor(
 
         binding.titleBar.setOnTouchListener { _, event -> handleTitleDrag(event) }
         binding.btnClose.setOnClickListener { onCloseListener?.invoke() }
+        binding.btnMinimize.setOnClickListener { minimize() }
         binding.btnFullscreen.setOnClickListener { toggleFullscreen() }
 
     }
@@ -178,6 +179,18 @@ class FloatingWindowView @JvmOverloads constructor(
 
     private fun toggleFullscreen() {
         if (isFullscreen) exitFullscreen() else enterFullscreen()
+    }
+
+    private fun minimize() {
+        savedX = x
+        savedY = y
+        savedWidth = width
+        savedHeight = height
+
+        layoutParams = FrameLayout.LayoutParams(minWidth, minHeight)
+        x = (fullScreenW - minWidth).toFloat() / 2
+        y = (fullScreenH - minHeight).toFloat() / 2
+        requestLayout()
     }
 
     private fun enterFullscreen() {

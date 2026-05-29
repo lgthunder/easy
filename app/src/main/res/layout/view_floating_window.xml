@@ -52,6 +52,14 @@
             android:visibility="gone" />
 
         <ImageButton
+            android:id="@+id/btnMinimize"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/minimize"
+            android:src="@android:drawable/ic_menu_more" />
+
+        <ImageButton
             android:id="@+id/btnFullscreen"
             android:layout_width="28dp"
             android:layout_height="28dp"
