@@ -7,6 +7,7 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.MotionEvent
+import android.view.ScaleGestureDetector
 import android.view.View
 import androidx.core.graphics.toRect
 
@@ -34,6 +35,15 @@ class TrimRangeView @JvmOverloads constructor(
     }
     private val handleStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = 0xFF6200EE.toInt()
+        style = Paint.Style.STROKE
+        strokeWidth = 4f
+    }
+    private val zoomHandlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFFFFFFFF.toInt()
+        style = Paint.Style.FILL
+    }
+    private val zoomHandleStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFFFF9800.toInt()
         style = Paint.Style.STROKE
         strokeWidth = 4f
     }
@@ -77,6 +87,73 @@ class TrimRangeView @JvmOverloads constructor(
     private val handleRadius = 20f
     private var dragging: Int = DRAG_NONE
 
+    private var zoomScale: Float = 1f
+    private var viewCenterMs: Long = 0L
+    private var zoomAnchorMs: Long = 0L
+    private val minZoom: Float = 1f
+    private val maxZoom: Float = 5f
+    private val isZoomed: Boolean get() = zoomScale > 1.01f
+
+    private val scaleDetector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+        override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
+            zoomAnchorMs = pixelToTime(detector.focusX, width.toFloat())
+            return true
+        }
+
+        override fun onScale(detector: ScaleGestureDetector): Boolean {
+            zoomScale = (zoomScale * detector.scaleFactor).coerceIn(minZoom, maxZoom)
+            viewCenterMs = zoomAnchorMs
+            invalidate()
+            scheduleZoomChangedCallback()
+            return true
+        }
+
+        override fun onScaleEnd(detector: ScaleGestureDetector) {
+            if (zoomScale < 1.02f) zoomScale = 1f
+            viewCenterMs = zoomAnchorMs
+            invalidate()
+            triggerZoomChanged()
+        }
+    })
+
+    var onZoomChanged: ((visibleStartMs: Long, visibleEndMs: Long) -> Unit)? = null
+
+    private var zoomChangedPending = false
+
+    private fun scheduleZoomChangedCallback() {
+        if (zoomChangedPending) return
+        zoomChangedPending = true
+        postDelayed({
+            zoomChangedPending = false
+            triggerZoomChanged()
+        }, 100L)
+    }
+
+    private fun triggerZoomChanged() {
+        if (isZoomed) {
+            onZoomChanged?.invoke(visibleStartMs, visibleEndMs)
+        } else {
+            onZoomChanged?.invoke(0, durationMs)
+        }
+    }
+
+    private val visibleDurationMs: Long
+        get() = (durationMs / zoomScale).toLong().coerceAtLeast(1)
+    private val visibleStartMs: Long
+        get() = (viewCenterMs - visibleDurationMs / 2).coerceIn(0, durationMs - visibleDurationMs)
+    private val visibleEndMs: Long
+        get() = visibleStartMs + visibleDurationMs
+
+    private fun pixelToTime(px: Float, w: Float): Long {
+        if (!isZoomed) return (px / w * durationMs).toLong()
+        return (visibleStartMs + px / w * visibleDurationMs).toLong()
+    }
+
+    private fun timeToPixel(ms: Long, w: Float): Float {
+        if (!isZoomed) return (ms.toFloat() / durationMs) * w
+        return ((ms - visibleStartMs).toFloat() / visibleDurationMs) * w
+    }
+
     companion object {
         private const val DRAG_NONE = 0
         private const val DRAG_START = 1
@@ -87,6 +164,7 @@ class TrimRangeView @JvmOverloads constructor(
     fun setRange(start: Long, end: Long) {
         startMs = start.coerceIn(0, durationMs)
         endMs = end.coerceIn(0, durationMs)
+        zoomScale = 1f
         invalidate()
     }
 
@@ -105,11 +183,11 @@ class TrimRangeView @JvmOverloads constructor(
         val trackTop = textHeight + textMargin * 2
         val trackBottom = trackTop + trackH
 
-        drawThumbnails(canvas, trackTop, trackBottom)
+        drawThumbnails(canvas, trackTop, trackBottom, w)
 
         if (durationMs > 0) {
-            val startX = (startMs.toFloat() / durationMs) * w
-            val endX = (endMs.toFloat() / durationMs) * w
+            val startX = timeToPixel(startMs, w)
+            val endX = timeToPixel(endMs, w)
 
             canvas.drawRect(startX, trackTop, endX, trackBottom, rangePaint)
 
@@ -119,55 +197,89 @@ class TrimRangeView @JvmOverloads constructor(
             canvas.drawLine(startX, trackBottom, endX, trackBottom, borderPaint)
 
             val trackCenterY = trackTop + trackH / 2
-            drawHandle(canvas, startX, trackCenterY)
-            drawHandle(canvas, endX, trackCenterY)
+            if (isZoomed) {
+                drawZoomHandle(canvas, startX, trackCenterY)
+                drawZoomHandle(canvas, endX, trackCenterY)
+
+                val zoomText = "${zoomScale.toInt()}x"
+                val zoomTextWidth = positionTextPaint.measureText(zoomText)
+                positionTextPaint.color = 0xCC000000.toInt()
+                canvas.drawRect(4f, trackTop - textHeight - textMargin, 4f + zoomTextWidth + 8f, trackTop, positionTextPaint)
+                positionTextPaint.color = 0xFFFF9800.toInt()
+                canvas.drawText(zoomText, 8f + zoomTextWidth / 2, trackTop - textMargin / 2, positionTextPaint)
+            } else {
+                drawHandle(canvas, startX, trackCenterY)
+                drawHandle(canvas, endX, trackCenterY)
+            }
 
             if (currentPositionMs > 0 && currentPositionMs <= durationMs) {
-                val posX = (currentPositionMs.toFloat() / durationMs) * w
+                val posX = timeToPixel(currentPositionMs, w)
                 canvas.drawLine(posX, trackTop, posX, trackBottom, positionLinePaint)
                 canvas.drawCircle(posX, trackCenterY, 5f, positionLinePaint)
-                
+
                 val timeText = formatTime(currentPositionMs)
                 val textWidth = positionTextPaint.measureText(timeText)
                 val textY = textHeight + textMargin
-                
+
                 val bgLeft = posX - textWidth / 2 - 4f
                 val bgRight = posX + textWidth / 2 + 4f
                 val bgTop = textMargin
                 val bgBottom = textHeight + textMargin * 2
-                
+
                 positionTextPaint.color = 0xCC000000.toInt()
                 canvas.drawRect(bgLeft, bgTop, bgRight, bgBottom, positionTextPaint)
-                
+
                 positionTextPaint.color = 0xFFFFFFFF.toInt()
                 canvas.drawText(timeText, posX, textY, positionTextPaint)
             }
         }
     }
 
-    private fun drawThumbnails(canvas: Canvas, top: Float, bottom: Float) {
-        val w = width.toFloat()
-        if (thumbnails.isEmpty() || w <= 0) return
-        val count = thumbnailCount.coerceIn(1, thumbnails.size)
-        val cellW = w / count
+    private fun drawThumbnails(canvas: Canvas, top: Float, bottom: Float, w: Float) {
+        if (thumbnails.isEmpty() || w <= 0 || durationMs <= 0) return
+        val totalCount = thumbnailCount.coerceIn(1, thumbnails.size)
         val cellH = bottom - top
-        for (i in 0 until count) {
-            val bmp = thumbnails[i % thumbnails.size]
-            val cellLeft = i * cellW
-            val cellRight = (i + 1) * cellW
 
-            canvas.save()
-            canvas.clipRect(cellLeft, top, cellRight, bottom)
+        if (isZoomed) {
+            val startIndex = (visibleStartMs.toFloat() / durationMs * totalCount).toInt().coerceIn(0, totalCount - 1)
+            val endIndex = (visibleEndMs.toFloat() / durationMs * totalCount).toInt().coerceIn(0, totalCount - 1)
+            val cellW = w / (endIndex - startIndex + 1)
+            for (i in startIndex..endIndex) {
+                val bmp = thumbnails[i % thumbnails.size]
+                val cellLeft = (i - startIndex) * cellW
+                val cellRight = cellLeft + cellW
 
-            val dstW = (bmp.width.toFloat() / bmp.height.toFloat()) * cellH
-            val dstH = cellH
-            val dstCenter = cellLeft + cellW / 2f
-            thumbDstRect.set(dstCenter - dstW / 2f, top, dstCenter + dstW / 2f, top + dstH)
+                canvas.save()
+                canvas.clipRect(cellLeft, top, cellRight, bottom)
 
-            thumbSrcRect.set(0f, 0f, bmp.width.toFloat(), bmp.height.toFloat())
-            canvas.drawBitmap(bmp, thumbSrcRect.toRect(), thumbDstRect, null)
+                val dstW = (bmp.width.toFloat() / bmp.height.toFloat()) * cellH
+                val dstCenter = cellLeft + cellW / 2f
+                thumbDstRect.set(dstCenter - dstW / 2f, top, dstCenter + dstW / 2f, top + cellH)
 
-            canvas.restore()
+                thumbSrcRect.set(0f, 0f, bmp.width.toFloat(), bmp.height.toFloat())
+                canvas.drawBitmap(bmp, thumbSrcRect.toRect(), thumbDstRect, null)
+
+                canvas.restore()
+            }
+        } else {
+            val cellW = w / totalCount
+            for (i in 0 until totalCount) {
+                val bmp = thumbnails[i % thumbnails.size]
+                val cellLeft = i * cellW
+                val cellRight = (i + 1) * cellW
+
+                canvas.save()
+                canvas.clipRect(cellLeft, top, cellRight, bottom)
+
+                val dstW = (bmp.width.toFloat() / bmp.height.toFloat()) * cellH
+                val dstCenter = cellLeft + cellW / 2f
+                thumbDstRect.set(dstCenter - dstW / 2f, top, dstCenter + dstW / 2f, top + cellH)
+
+                thumbSrcRect.set(0f, 0f, bmp.width.toFloat(), bmp.height.toFloat())
+                canvas.drawBitmap(bmp, thumbSrcRect.toRect(), thumbDstRect, null)
+
+                canvas.restore()
+            }
         }
     }
 
@@ -176,93 +288,50 @@ class TrimRangeView @JvmOverloads constructor(
         canvas.drawCircle(cx, cy, handleRadius, handleStrokePaint)
     }
 
+    private fun drawZoomHandle(canvas: Canvas, cx: Float, cy: Float) {
+        canvas.drawCircle(cx, cy, handleRadius, zoomHandlePaint)
+        canvas.drawCircle(cx, cy, handleRadius, zoomHandleStrokePaint)
+    }
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        scaleDetector.onTouchEvent(event)
+        if (scaleDetector.isInProgress) return true
+
         if (durationMs <= 0) return false
         val x = event.x
         val w = width.toFloat()
-        val startX = (startMs.toFloat() / durationMs) * w
-        val endX = (endMs.toFloat() / durationMs) * w
-        val h = height.toFloat()
-        val trackTop = (h - thumbnailHeight) / 2f
-        val trackBottom = trackTop + thumbnailHeight
+        val startX = timeToPixel(startMs, w)
+        val endX = timeToPixel(endMs, w)
+        val trackH = thumbnailHeight
+        val textHeight = positionTextPaint.descent() - positionTextPaint.ascent()
+        val textMargin = 8f
+        val trackTop = textHeight + textMargin * 2
+        val trackBottom = trackTop + trackH
+        val trackCenterY = trackTop + trackH / 2
 
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
-                val distStart = Math.hypot((x - startX).toDouble(), (event.y - h / 2).toDouble())
-                val distEnd = Math.hypot((x - endX).toDouble(), (event.y - h / 2).toDouble())
-                val posX = (currentPositionMs.toFloat() / durationMs) * w
-                val distPos = Math.hypot((x - posX).toDouble(), (event.y - h / 2).toDouble())
+                val posX = timeToPixel(currentPositionMs, w)
+                val distStart = Math.hypot((x - startX).toDouble(), (event.y - trackCenterY).toDouble())
+                val distEnd = Math.hypot((x - endX).toDouble(), (event.y - trackCenterY).toDouble())
+                val distPos = Math.hypot((x - posX).toDouble(), (event.y - trackCenterY).toDouble())
                 dragging = when {
                     distPos < handleRadius * 3 && currentPositionMs > 0 -> DRAG_POSITION
                     distStart < handleRadius * 2 -> DRAG_START
                     distEnd < handleRadius * 2 -> DRAG_END
-                    event.y in trackTop..trackBottom -> {
-                        val ratio = (x / w).coerceIn(0f, 1f)
-                        val t = (ratio * durationMs).toLong()
-                        val distStart2 = Math.abs(t - startMs)
-                        val distEnd2 = Math.abs(t - endMs)
-                        if (distStart2 <= distEnd2) DRAG_START else DRAG_END
-                    }
                     else -> DRAG_NONE
                 }
-                if (dragging != DRAG_NONE) {
-                    val ratio = (x / w).coerceIn(0f, 1f)
-                    val timeAtPos = (ratio * durationMs).toLong()
-                    when (dragging) {
-                        DRAG_POSITION -> {
-                            currentPositionMs = timeAtPos.coerceIn(0, durationMs)
-                            onSeeking?.invoke(currentPositionMs)
-                        }
-                        DRAG_START -> {
-                            startMs = timeAtPos.coerceIn(0, endMs - 100)
-                            onSeeking?.invoke(startMs)
-                        }
-                        DRAG_END -> {
-                            endMs = timeAtPos.coerceIn(startMs + 100, durationMs)
-                            onSeeking?.invoke(endMs)
-                        }
-                    }
-                    onRangeChanged?.invoke(startMs, endMs)
-                    invalidate()
-                }
-                return dragging != DRAG_NONE
+                return dragging != DRAG_NONE || event.y in trackTop..trackBottom
             }
             MotionEvent.ACTION_MOVE -> {
-                val ratio = (x / w).coerceIn(0f, 1f)
-                val timeAtPos = (ratio * durationMs).toLong()
-                when (dragging) {
-                    DRAG_POSITION -> {
-                        currentPositionMs = timeAtPos.coerceIn(0, durationMs)
-                        onSeeking?.invoke(currentPositionMs)
-                    }
-                    DRAG_START -> {
-                        startMs = timeAtPos.coerceIn(0, endMs - 100)
-                        onSeeking?.invoke(startMs)
-                    }
-                    DRAG_END -> {
-                        endMs = timeAtPos.coerceIn(startMs + 100, durationMs)
-                        onSeeking?.invoke(endMs)
-                    }
+                if (dragging != DRAG_NONE) {
+                    applyDrag(pixelToTime(x, w), w)
                 }
-                invalidate()
                 return true
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                val ratio = (x / w).coerceIn(0f, 1f)
-                val timeAtPos = (ratio * durationMs).toLong()
-                when (dragging) {
-                    DRAG_POSITION -> {
-                        currentPositionMs = timeAtPos.coerceIn(0, durationMs)
-                        onSeeking?.invoke(currentPositionMs)
-                    }
-                    DRAG_START -> {
-                        startMs = timeAtPos.coerceIn(0, endMs - 100)
-                        onSeeking?.invoke(startMs)
-                    }
-                    DRAG_END -> {
-                        endMs = timeAtPos.coerceIn(startMs + 100, durationMs)
-                        onSeeking?.invoke(endMs)
-                    }
+                if (dragging != DRAG_NONE) {
+                    applyDrag(pixelToTime(x, w), w)
                 }
                 onRangeChanged?.invoke(startMs, endMs)
                 dragging = DRAG_NONE
@@ -271,6 +340,25 @@ class TrimRangeView @JvmOverloads constructor(
             }
         }
         return super.onTouchEvent(event)
+    }
+
+    private fun applyDrag(timeAtPos: Long, w: Float) {
+        when (dragging) {
+            DRAG_POSITION -> {
+                currentPositionMs = timeAtPos.coerceIn(0, durationMs)
+                onSeeking?.invoke(currentPositionMs)
+            }
+            DRAG_START -> {
+                startMs = timeAtPos.coerceIn(0, endMs - 100)
+                onSeeking?.invoke(startMs)
+            }
+            DRAG_END -> {
+                endMs = timeAtPos.coerceIn(startMs + 100, durationMs)
+                onSeeking?.invoke(endMs)
+            }
+        }
+        onRangeChanged?.invoke(startMs, endMs)
+        invalidate()
     }
 
     private fun formatTime(ms: Long): String {

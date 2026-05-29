@@ -48,6 +48,12 @@ class VideoEditActivity : AppCompatActivity() {
         override fun run() {
             player?.let { p ->
                 if (p.isPlaying) {
+                    val pos = p.currentPosition
+                    val end = binding.trimRangeView.endMs
+                    val start = binding.trimRangeView.startMs
+                    if (pos >= end) {
+                        p.seekTo(start)
+                    }
                     binding.trimRangeView.currentPositionMs = p.currentPosition
                 }
             }
@@ -101,8 +107,8 @@ class VideoEditActivity : AppCompatActivity() {
                     positionHandler.post(positionUpdater)
                 }
                 if (state == Player.STATE_ENDED) {
-                    binding.trimRangeView.currentPositionMs = 0L
                     p.seekTo(binding.trimRangeView.startMs)
+                    binding.trimRangeView.currentPositionMs = binding.trimRangeView.startMs
                     p.play()
                 }
             }
@@ -132,6 +138,36 @@ class VideoEditActivity : AppCompatActivity() {
 
             for (i in 0 until count) {
                 val timeMs = (interval * i + interval / 2)
+                val bitmap = VideoFrameCache.extractAndCache(
+                    this@VideoEditActivity,
+                    file.absolutePath,
+                    timeMs,
+                    thumbW,
+                    thumbH
+                )
+                if (bitmap != null) {
+                    thumbs.add(bitmap)
+                }
+            }
+
+            withContext(Dispatchers.Main) {
+                binding.trimRangeView.setThumbnails(thumbs)
+            }
+        }
+    }
+
+    private fun generateThumbnailsForRange(file: File, startMs: Long, endMs: Long, thumbCount: Int) {
+        val rangeDuration = endMs - startMs
+        val interval = rangeDuration / thumbCount
+        if (interval <= 0) return
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            val thumbs = mutableListOf<Bitmap>()
+            val thumbH = (thumbnailHeightDp * resources.displayMetrics.density * 2).toInt()
+            val thumbW = (thumbnailHeightDp * resources.displayMetrics.density * 2).toInt()
+
+            for (i in 0 until thumbCount) {
+                val timeMs = startMs + interval * i + interval / 2
                 val bitmap = VideoFrameCache.extractAndCache(
                     this@VideoEditActivity,
                     file.absolutePath,
@@ -210,6 +246,19 @@ class VideoEditActivity : AppCompatActivity() {
 
         binding.trimRangeView.onRangeChanged = { _, _ ->
             updateTimeText()
+        }
+
+        binding.trimRangeView.onZoomChanged = { startMs, endMs ->
+            val videoFile = File(sourcePath)
+            val totalDuration = player?.duration ?: 0L
+            if (totalDuration > 0) {
+                if (startMs == 0L && endMs == totalDuration) {
+                    generateThumbnails(videoFile, totalDuration)
+                } else {
+                    val thumbCount = (binding.trimRangeView.width / 6).coerceIn(20, 80)
+                    generateThumbnailsForRange(videoFile, startMs, endMs, thumbCount)
+                }
+            }
         }
 
         binding.btnPlayPause.setOnClickListener {
