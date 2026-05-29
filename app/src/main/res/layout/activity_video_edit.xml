@@ -20,7 +20,7 @@
         android:layout_gravity="bottom"
         android:paddingLeft="40dp"
         android:paddingRight="40dp"
-        android:background="#CC000000"
+        android:background="#40000000"
         android:orientation="vertical"
         android:padding="12dp">
 
@@ -30,10 +30,34 @@
             android:gravity="center"
             android:orientation="horizontal">
 
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center">
+
+                <ImageButton
+                    android:id="@+id/btnSpeed"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="Speed"
+                    android:src="@android:drawable/ic_media_ff" />
+
+                <TextView
+                    android:id="@+id/tvSpeed"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="1x"
+                    android:textColor="@android:color/white"
+                    android:textSize="10sp" />
+            </LinearLayout>
+
             <ImageButton
                 android:id="@+id/btnUndo"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
+                android:layout_marginLeft="16dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/undo"
                 android:src="@android:drawable/ic_menu_revert" />
@@ -54,6 +78,31 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/trim_save"
                 android:src="@android:drawable/ic_menu_save" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:layout_marginLeft="16dp">
+
+                <ImageButton
+                    android:id="@+id/btnVolume"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/mute"
+                    android:src="@android:drawable/ic_lock_silent_mode" />
+
+                <SeekBar
+                    android:id="@+id/sbVolume"
+                    android:layout_width="100dp"
+                    android:layout_height="wrap_content"
+                    android:max="100"
+                    android:progress="50"
+                    android:thumbTint="#FFFFFF"
+                    android:progressTint="#FFFFFF" />
+            </LinearLayout>
 
         </LinearLayout>
 

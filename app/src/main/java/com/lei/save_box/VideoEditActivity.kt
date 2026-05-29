@@ -40,6 +40,9 @@ class VideoEditActivity : AppCompatActivity() {
     private var throttleRunnable: Runnable? = null
     private var lastCallTimeMs: Long = 0
 
+    private val speedOptions = arrayOf(0.5f, 1f, 1.25f, 1.5f, 2f)
+    private var currentSpeedIndex = 1
+
     private val positionHandler = Handler(Looper.getMainLooper())
     private val positionUpdater = object : Runnable {
         override fun run() {
@@ -151,6 +154,34 @@ class VideoEditActivity : AppCompatActivity() {
 
 
     private fun setupButtons() {
+        binding.btnSpeed.setOnClickListener {
+            currentSpeedIndex = (currentSpeedIndex + 1) % speedOptions.size
+            val speed = speedOptions[currentSpeedIndex]
+            player?.setPlaybackSpeed(speed)
+            binding.tvSpeed.text = "${speed}x"
+        }
+
+        binding.btnVolume.setOnClickListener {
+            val currentVolume = player?.volume ?: 0f
+            if (currentVolume > 0) {
+                player?.volume = 0f
+                binding.sbVolume.progress = 0
+            } else {
+                player?.volume = 1f
+                binding.sbVolume.progress = 100
+            }
+        }
+
+        binding.sbVolume.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: android.widget.SeekBar, progress: Int, fromUser: Boolean) {
+                if (fromUser) {
+                    player?.volume = progress / 100f
+                }
+            }
+            override fun onStartTrackingTouch(seekBar: android.widget.SeekBar) {}
+            override fun onStopTrackingTouch(seekBar: android.widget.SeekBar) {}
+        })
+
         binding.trimRangeView.onSeeking = { timeMs ->
             val now = System.currentTimeMillis()
             val elapsed = now - lastCallTimeMs
