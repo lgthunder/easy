@@ -17,6 +17,7 @@ import androidx.appcompat.widget.SwitchCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.bumptech.glide.Glide
 import com.lei.save_box.adapter.FileAdapter
 import com.lei.save_box.databinding.ActivityVaultBinding
 import com.lei.save_box.manager.BackgroundTaskManager
@@ -130,6 +131,7 @@ class VaultActivity : AppCompatActivity(), LockableActivity {
             getString(R.string.tile_vertical),
             getString(R.string.tile_grid),
             getString(R.string.settings),
+            getString(R.string.clear_cache),
             getString(R.string.exit_app)
         )
         AlertDialog.Builder(this)
@@ -144,7 +146,8 @@ class VaultActivity : AppCompatActivity(), LockableActivity {
                     5 -> floatingWindowManager.tileVertical()
                     6 -> floatingWindowManager.tileGrid()
                     7 -> showSettingsDialog()
-                    8 -> showExitDialog()
+                    8 -> clearGlideCache()
+                    9 -> showExitDialog()
                 }
             }
             .show()
@@ -294,6 +297,16 @@ class VaultActivity : AppCompatActivity(), LockableActivity {
             .setView(switchView)
             .setPositiveButton(R.string.confirm, null)
             .show()
+    }
+
+    private fun clearGlideCache() {
+        lifecycleScope.launch(Dispatchers.IO) {
+            Glide.get(this@VaultActivity).clearDiskCache()
+            withContext(Dispatchers.Main) {
+                Glide.get(this@VaultActivity).clearMemory()
+                Toast.makeText(this@VaultActivity, R.string.cache_cleared, Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun deleteSelectedFiles() {

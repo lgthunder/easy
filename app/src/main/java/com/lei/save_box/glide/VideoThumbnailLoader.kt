@@ -71,7 +71,14 @@ class VideoThumbnailDataFetcher(
             }
 
             if (rawBitmap != null) {
-                val scaled = Bitmap.createScaledBitmap(rawBitmap, width.coerceAtLeast(96), height.coerceAtLeast(96), true)
+                val targetW = width.coerceAtLeast(96)
+                val targetH = height.coerceAtLeast(96)
+                val srcW = rawBitmap.width.toFloat()
+                val srcH = rawBitmap.height.toFloat()
+                val scale = minOf(targetW / srcW, targetH / srcH)
+                val scaledW = (srcW * scale).toInt().coerceAtLeast(1)
+                val scaledH = (srcH * scale).toInt().coerceAtLeast(1)
+                val scaled = Bitmap.createScaledBitmap(rawBitmap, scaledW, scaledH, true)
                 if (scaled !== rawBitmap) rawBitmap.recycle()
                 Log.d("leiting", "VideoThumbnailDataFetcher: 提取成功，存入缓存 filePath=${model.filePath} time=${model.time}")
                 callback.onDataReady(scaled)

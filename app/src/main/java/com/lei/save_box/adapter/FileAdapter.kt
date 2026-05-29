@@ -91,6 +91,7 @@ class FileAdapter(
                         .asBitmap()
                         .load(VideoThumbnail(item.path,0))
                         .override(96, 96)
+                        .centerCrop()
                         .placeholder(android.R.drawable.ic_media_play)
                         .error(android.R.drawable.ic_media_play)
                         .diskCacheStrategy(DiskCacheStrategy.ALL)

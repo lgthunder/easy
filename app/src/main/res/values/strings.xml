@@ -50,4 +50,6 @@
     <string name="play">播放</string>
     <string name="pause">暂停</string>
     <string name="task_list_title">任务列表</string>
+    <string name="clear_cache">清理缓存</string>
+    <string name="cache_cleared">缓存已清理</string>
 </resources>

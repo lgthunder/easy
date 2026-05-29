@@ -99,7 +99,12 @@ object VideoFrameCache {
             val rawBitmap = retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
 
             rawBitmap?.let { bmp ->
-                val scaled = Bitmap.createScaledBitmap(bmp, targetWidth, targetHeight, true)
+                val srcW = bmp.width.toFloat()
+                val srcH = bmp.height.toFloat()
+                val scale = minOf(targetWidth.toFloat() / srcW, targetHeight.toFloat() / srcH)
+                val scaledW = (srcW * scale).toInt().coerceAtLeast(1)
+                val scaledH = (srcH * scale).toInt().coerceAtLeast(1)
+                val scaled = Bitmap.createScaledBitmap(bmp, scaledW, scaledH, true)
                 if (scaled !== bmp) bmp.recycle()
 
                 val success = saveToCache(context, scaled, filePath, timeMs)
