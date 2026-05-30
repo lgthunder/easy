@@ -104,7 +104,7 @@ class TrimRangeView @JvmOverloads constructor(
             zoomScale = (zoomScale * detector.scaleFactor).coerceIn(minZoom, maxZoom)
             viewCenterMs = zoomAnchorMs
             invalidate()
-            scheduleZoomChangedCallback()
+//            scheduleZoomChangedCallback()
             return true
         }
 
@@ -241,12 +241,12 @@ class TrimRangeView @JvmOverloads constructor(
         val cellH = bottom - top
 
         if (isZoomed) {
-            val startIndex = (visibleStartMs.toFloat() / durationMs * totalCount).toInt().coerceIn(0, totalCount - 1)
-            val endIndex = (visibleEndMs.toFloat() / durationMs * totalCount).toInt().coerceIn(0, totalCount - 1)
-            val cellW = w / (endIndex - startIndex + 1)
-            for (i in startIndex..endIndex) {
-                val bmp = thumbnails[i % thumbnails.size]
-                val cellLeft = (i - startIndex) * cellW
+            val totalCount = thumbnails.size
+            if (totalCount <= 0) return
+            val cellW = w / totalCount
+            for (i in 0 until totalCount) {
+                val bmp = thumbnails[i]
+                val cellLeft = i * cellW
                 val cellRight = cellLeft + cellW
 
                 canvas.save()

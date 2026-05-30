@@ -31,7 +31,7 @@ class VideoEditActivity : AppCompatActivity() {
     private var originalEnd: Long = 0
     private var sourcePath: String = ""
 
-    private val thumbnailThCount = 15
+    private val thumbnailThCount = 20
     private val thumbnailHeightDp = 60
     lateinit var oriFile :File
     val retriever = MediaMetadataRetriever()
@@ -250,7 +250,7 @@ class VideoEditActivity : AppCompatActivity() {
                 if (startMs == 0L && endMs == totalDuration) {
                     generateThumbnails(videoFile, totalDuration)
                 } else {
-                    val thumbCount = (binding.trimRangeView.width / 6).coerceIn(2, 10)
+                    val thumbCount = (binding.trimRangeView.width / 6).coerceIn(2, 20)
                     generateThumbnailsForRange(videoFile, startMs, endMs, thumbCount)
                 }
             }
