@@ -22,6 +22,7 @@ import com.bumptech.glide.Glide
 import com.lei.save_box.adapter.FileAdapter
 import com.lei.save_box.databinding.ActivityVaultBinding
 import com.lei.save_box.manager.BackgroundTaskManager
+import com.lei.save_box.manager.BackupManager
 import com.lei.save_box.manager.FileManager
 import com.lei.save_box.manager.FloatingWindowManager
 import com.lei.save_box.manager.SettingsManager
@@ -40,10 +41,12 @@ class VaultActivity : AppCompatActivity(), LockableActivity {
     private lateinit var fileManager: FileManager
     private lateinit var settingsManager: SettingsManager
     private lateinit var floatingWindowManager: FloatingWindowManager
+    private lateinit var backupManager: BackupManager
     private lateinit var adapter: FileAdapter
     private var currentSortMode = SortMode.DATE_DESC
     private var taskFloatingWindow: TaskFloatingWindow? = null
     private var currentDir: File? = null
+    private var backupImportUri: Uri? = null
 
     private val isAtRoot: Boolean
         get() = currentDir == null || currentDir == fileManager.vaultDir
@@ -77,6 +80,15 @@ class VaultActivity : AppCompatActivity(), LockableActivity {
         loadFiles()
     }
 
+    private val backupImportLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let {
+            backupImportUri = it
+            showImportPasswordDialog()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
@@ -88,6 +100,7 @@ class VaultActivity : AppCompatActivity(), LockableActivity {
         fileManager = FileManager(this)
         settingsManager = SettingsManager(this)
         floatingWindowManager = FloatingWindowManager(this, binding.floatingContainer)
+        backupManager = BackupManager(this)
         currentDir = fileManager.vaultDir
 
         setupRecyclerView()
@@ -314,6 +327,8 @@ class VaultActivity : AppCompatActivity(), LockableActivity {
         val items = arrayOf(
             getString(R.string.new_folder),
             getString(R.string.trash),
+            getString(R.string.backup_export),
+            getString(R.string.backup_import),
             getString(R.string.sort_by_name),
             getString(R.string.sort_by_date),
             getString(R.string.sort_by_size),
@@ -331,16 +346,18 @@ class VaultActivity : AppCompatActivity(), LockableActivity {
                 when (which) {
                     0 -> showCreateFolderDialog()
                     1 -> openTrash()
-                    2 -> toggleSort(SortMode.NAME_ASC, SortMode.NAME_DESC)
-                    3 -> toggleSort(SortMode.DATE_ASC, SortMode.DATE_DESC)
-                    4 -> toggleSort(SortMode.SIZE_ASC, SortMode.SIZE_DESC)
-                    5 -> toggleSort(SortMode.TYPE_ASC, SortMode.TYPE_DESC)
-                    6 -> floatingWindowManager.tileHorizontal()
-                    7 -> floatingWindowManager.tileVertical()
-                    8 -> floatingWindowManager.tileGrid()
-                    9 -> showSettingsDialog()
-                    10 -> clearGlideCache()
-                    11 -> showExitDialog()
+                    2 -> showExportPasswordDialog()
+                    3 -> openBackupImport()
+                    4 -> toggleSort(SortMode.NAME_ASC, SortMode.NAME_DESC)
+                    5 -> toggleSort(SortMode.DATE_ASC, SortMode.DATE_DESC)
+                    6 -> toggleSort(SortMode.SIZE_ASC, SortMode.SIZE_DESC)
+                    7 -> toggleSort(SortMode.TYPE_ASC, SortMode.TYPE_DESC)
+                    8 -> floatingWindowManager.tileHorizontal()
+                    9 -> floatingWindowManager.tileVertical()
+                    10 -> floatingWindowManager.tileGrid()
+                    11 -> showSettingsDialog()
+                    12 -> clearGlideCache()
+                    13 -> showExitDialog()
                 }
             }
             .show()
@@ -369,6 +386,103 @@ class VaultActivity : AppCompatActivity(), LockableActivity {
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
+    }
+
+    private fun showExportPasswordDialog() {
+        val input = EditText(this).apply {
+            hint = getString(R.string.backup_password_hint)
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.backup_export)
+            .setMessage(R.string.backup_export_desc)
+            .setView(input)
+            .setPositiveButton(R.string.confirm) { _, _ ->
+                val password = input.text.toString().trim()
+                if (password.isEmpty()) {
+                    Toast.makeText(this, R.string.backup_password_empty, Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                startExport(password)
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun startExport(password: String) {
+        val helper = ProgressDialogHelper(this)
+        lifecycleScope.launch(Dispatchers.IO) {
+            withContext(Dispatchers.Main) {
+                helper.show(getString(R.string.backup_exporting), 100)
+            }
+            val success = backupManager.exportBackup(fileManager.vaultDir, password) { progress ->
+                lifecycleScope.launch(Dispatchers.Main) {
+                    helper.updateProgress(progress.overallPercent,
+                        "${progress.phase} ${progress.currentFile}")
+                }
+            }
+            withContext(Dispatchers.Main) {
+                helper.dismiss()
+                if (success) {
+                    Toast.makeText(this@VaultActivity, R.string.backup_export_success, Toast.LENGTH_LONG).show()
+                } else {
+                    Toast.makeText(this@VaultActivity, R.string.backup_export_failed, Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    private fun openBackupImport() {
+        backupImportLauncher.launch(arrayOf("application/octet-stream", "*/*"))
+    }
+
+    private fun showImportPasswordDialog() {
+        val uri = backupImportUri ?: return
+        val input = EditText(this).apply {
+            hint = getString(R.string.backup_password_hint)
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.backup_import)
+            .setMessage(R.string.backup_import_desc)
+            .setView(input)
+            .setPositiveButton(R.string.confirm) { _, _ ->
+                val password = input.text.toString().trim()
+                if (password.isEmpty()) {
+                    Toast.makeText(this, R.string.backup_password_empty, Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                startImport(uri, password)
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun startImport(uri: Uri, password: String) {
+        val helper = ProgressDialogHelper(this)
+        lifecycleScope.launch(Dispatchers.IO) {
+            withContext(Dispatchers.Main) {
+                helper.show(getString(R.string.backup_importing), 100)
+            }
+            val result = backupManager.importBackup(uri, fileManager.vaultDir, password) { progress ->
+                lifecycleScope.launch(Dispatchers.Main) {
+                    helper.updateProgress(progress.overallPercent,
+                        "${progress.phase} ${progress.currentEntry}")
+                }
+            }
+            withContext(Dispatchers.Main) {
+                helper.dismiss()
+                when {
+                    result < 0 -> Toast.makeText(this@VaultActivity, R.string.backup_import_password_error, Toast.LENGTH_SHORT).show()
+                    result > 0 -> {
+                        Toast.makeText(this@VaultActivity, getString(R.string.backup_import_success, result), Toast.LENGTH_SHORT).show()
+                        loadFiles()
+                    }
+                    else -> Toast.makeText(this@VaultActivity, R.string.backup_import_failed, Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+        backupImportUri = null
     }
 
     private fun openTrash() {
