@@ -621,19 +621,34 @@ class VaultActivity : AppCompatActivity(), LockableActivity {
     }
 
     private fun showSettingsDialog() {
-        val switchView = SwitchCompat(this).apply {
+        val container = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(40, 20, 40, 20)
+        }
+
+        val biometricSwitch = SwitchCompat(this).apply {
             text = getString(R.string.biometric_toggle)
             isChecked = settingsManager.isBiometricEnabled
             setOnCheckedChangeListener { _, isChecked ->
                 settingsManager.isBiometricEnabled = isChecked
             }
-            setPadding(40, 20, 40, 20)
+            setPadding(0, 10, 0, 10)
         }
+        container.addView(biometricSwitch)
+
+        val ffmpegSwitch = SwitchCompat(this).apply {
+            text = getString(R.string.ffmpeg_toggle)
+            isChecked = settingsManager.useFFmpeg
+            setOnCheckedChangeListener { _, isChecked ->
+                settingsManager.useFFmpeg = isChecked
+            }
+            setPadding(0, 10, 0, 10)
+        }
+        container.addView(ffmpegSwitch)
 
         AlertDialog.Builder(this)
             .setTitle(R.string.settings)
-            .setMessage(R.string.biometric_toggle_desc)
-            .setView(switchView)
+            .setView(container)
             .setPositiveButton(R.string.confirm, null)
             .show()
     }

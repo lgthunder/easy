@@ -55,6 +55,7 @@
     <string name="settings">设置</string>
     <string name="biometric_toggle">开启生物识别验证</string>
     <string name="biometric_toggle_desc">进入前需要指纹或人脸验证</string>
+    <string name="ffmpeg_toggle">使用 FFmpeg 提取视频帧（速度更快，关闭后使用系统方式）</string>
     <string name="biometric_title">身份验证</string>
     <string name="biometric_subtitle">请验证身份以进入</string>
     <string name="biometric_not_available">设备不支持生物识别，请先设置指纹或面部解锁</string>

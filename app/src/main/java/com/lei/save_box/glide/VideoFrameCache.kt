@@ -145,16 +145,22 @@ object VideoFrameCache {
                 missedIndices.add(index)
             }
         }
-
+        Log.d(TAG, "extractAndCacheBatch missedIndices  ${missedIndices.toString()}")
         if (missedIndices.isEmpty()) {
             return results.toList()
         }
 
-        Log.d(TAG, "extractAndCacheBatch: ${missedIndices.size}/${timeMsList.size} cache misses, batch extracting with FFmpeg")
+        Log.d(TAG, "extractAndCacheBatch: ${missedIndices.size}/${timeMsList.size} cache misses, batch extracting")
 
         val missedTimeMs = missedIndices.map { timeMsList[it] }
-        val frames = FFmpegFrameExtractor.extractFrames(
+        val extractor = FrameExtractorProvider.select(context)
+        Log.d(TAG, "extractAndCacheBatch extractor  ${extractor}")
+        val frames = extractor.extractFrames(
             filePath, missedTimeMs, targetWidth, targetHeight
+        )
+
+        FrameExtractorProvider.benchmarkAndDecide(
+            context, filePath, missedTimeMs, targetWidth, targetHeight
         )
 
         for ((i, index) in missedIndices.withIndex()) {

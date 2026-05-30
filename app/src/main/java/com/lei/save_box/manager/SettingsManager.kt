@@ -12,7 +12,14 @@ class SettingsManager(context: Context) {
             prefs.edit().putBoolean(KEY_BIOMETRIC, value).apply()
         }
 
+    var useFFmpeg: Boolean
+        get() = prefs.getBoolean(KEY_USE_FFMPEG, true)
+        set(value) {
+            prefs.edit().putBoolean(KEY_USE_FFMPEG, value).apply()
+        }
+
     companion object {
         private const val KEY_BIOMETRIC = "biometric_enabled"
+        private const val KEY_USE_FFMPEG = "use_ffmpeg"
     }
 }

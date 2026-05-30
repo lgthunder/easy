@@ -10,6 +10,8 @@ import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.View
 import androidx.core.graphics.toRect
+import com.lei.save_box.glide.RetrieverBatchExtractor
+import com.lei.save_box.manager.SettingsManager
 
 class TrimRangeView @JvmOverloads constructor(
     context: Context,
@@ -109,7 +111,9 @@ class TrimRangeView @JvmOverloads constructor(
             zoomScale = (zoomScale * detector.scaleFactor).coerceIn(minZoom, maxZoom)
             viewCenterMs = zoomAnchorMs
             invalidate()
-            scheduleZoomChangedCallback()
+            if (useFFmpeg) {
+                scheduleZoomChangedCallback()
+            }
             return true
         }
 
@@ -124,6 +128,8 @@ class TrimRangeView @JvmOverloads constructor(
     var onZoomChanged: ((visibleStartMs: Long, visibleEndMs: Long) -> Unit)? = null
 
     private var zoomChangedPending = false
+
+    private var useFFmpeg = false
 
     private fun scheduleZoomChangedCallback() {
         if (zoomChangedPending) return
@@ -165,6 +171,11 @@ class TrimRangeView @JvmOverloads constructor(
         private const val DRAG_END = 2
         private const val DRAG_POSITION = 3
         private const val MIN_VISIBLE_DURATION_MS = 60_000L
+    }
+
+    init {
+        val settings = SettingsManager(context)
+        useFFmpeg = settings.useFFmpeg
     }
 
     fun setRange(start: Long, end: Long) {
