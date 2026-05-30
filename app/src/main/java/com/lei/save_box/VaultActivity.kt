@@ -656,6 +656,7 @@ class VaultActivity : AppCompatActivity(), LockableActivity {
     private fun clearGlideCache() {
         lifecycleScope.launch(Dispatchers.IO) {
             Glide.get(this@VaultActivity).clearDiskCache()
+            File(cacheDir, "video_frame_cache").deleteRecursively()
             withContext(Dispatchers.Main) {
                 Glide.get(this@VaultActivity).clearMemory()
                 Toast.makeText(this@VaultActivity, R.string.cache_cleared, Toast.LENGTH_SHORT).show()

@@ -2,72 +2,54 @@ package com.lei.save_box.glide
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.util.Log
-import com.bumptech.glide.Glide
-import com.bumptech.glide.load.engine.DiskCacheStrategy
-import com.bumptech.glide.signature.ObjectKey
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.FileOutputStream
+import java.security.MessageDigest
 
 object VideoFrameCache {
 
     private const val TAG = "VideoFrameCache"
+    private const val CACHE_DIR = "video_frame_cache"
+
+    private fun getCacheDir(context: Context): File {
+        val dir = File(context.cacheDir, CACHE_DIR)
+        if (!dir.exists()) dir.mkdirs()
+        return dir
+    }
+
+    private fun cacheFileName(key: String): String {
+        val digest = MessageDigest.getInstance("MD5").digest(key.toByteArray())
+        return digest.joinToString("") { "%02x".format(it) } + ".png"
+    }
 
     fun getCacheKey(filePath: String, timeMs: Long): String {
-        var time = (timeMs*1f/1000).toInt()
+        var time = (timeMs * 1f / 1000).toInt()
         return "${filePath}_frame_${time}"
     }
 
     fun isCached(context: Context, filePath: String, timeMs: Long): Boolean {
-        val cacheKey = getCacheKey(filePath, timeMs)
-        return try {
-            val bitmap = Glide.with(context)
-                .asBitmap()
-                .load(VideoThumbnail(filePath,timeMs))
-                .signature(ObjectKey(cacheKey))
-                .diskCacheStrategy(DiskCacheStrategy.ALL)
-                .submit()
-                .get()
-            bitmap != null
-        } catch (_: Exception) {
-            false
-        }
+        return File(getCacheDir(context), cacheFileName(getCacheKey(filePath, timeMs))).exists()
     }
 
     suspend fun loadFromCache(context: Context, filePath: String, timeMs: Long): Bitmap? {
-        val cacheKey = getCacheKey(filePath, timeMs)
         return withContext(Dispatchers.IO) {
-            try {
-                Glide.with(context)
-                    .asBitmap()
-                    .load(VideoThumbnail(filePath,timeMs))
-                    .signature(ObjectKey(cacheKey))
-                    .diskCacheStrategy(DiskCacheStrategy.ALL)
-                    .submit()
-                    .get()
-            } catch (_: Exception) {
-                Log.d(TAG, "loadFromCache miss: $cacheKey")
-                null
-            }
+            val cacheFile = File(getCacheDir(context), cacheFileName(getCacheKey(filePath, timeMs)))
+            if (cacheFile.exists()) BitmapFactory.decodeFile(cacheFile.absolutePath) else null
         }
     }
 
     suspend fun saveToCache(context: Context, bitmap: Bitmap, filePath: String, timeMs: Long): Boolean {
-        val cacheKey = getCacheKey(filePath, timeMs)
         return withContext(Dispatchers.IO) {
             try {
-                Glide.with(context)
-                    .asBitmap()
-                    .load(bitmap)
-                    .signature(ObjectKey(cacheKey))
-                    .diskCacheStrategy(DiskCacheStrategy.ALL)
-                    .preload()
-                Log.d(TAG, "saveToCache success: $cacheKey")
+                val cacheFile = File(getCacheDir(context), cacheFileName(getCacheKey(filePath, timeMs)))
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, FileOutputStream(cacheFile))
                 true
             } catch (_: Exception) {
-                Log.d(TAG, "saveToCache failed: $cacheKey")
                 false
             }
         }
@@ -96,23 +78,13 @@ object VideoFrameCache {
         return try {
             retriever.setDataSource(filePath)
             val timeUs = timeMs * 1000L
-            val rawBitmap = retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+            val scaled = retriever.getScaledFrameAtTime(
+                timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, targetWidth, targetHeight
+            )
 
-            rawBitmap?.let { bmp ->
-                val srcW = bmp.width.toFloat()
-                val srcH = bmp.height.toFloat()
-                val scale = minOf(targetWidth.toFloat() / srcW, targetHeight.toFloat() / srcH)
-                val scaledW = (srcW * scale).toInt().coerceAtLeast(1)
-                val scaledH = (srcH * scale).toInt().coerceAtLeast(1)
-                val scaled = Bitmap.createScaledBitmap(bmp, scaledW, scaledH, true)
-                if (scaled !== bmp) bmp.recycle()
-
-                val success = saveToCache(context, scaled, filePath, timeMs)
-                if (success) {
-                    Log.d(TAG, "extractAndCache: saved to cache $cacheKey")
-                }
-
-                scaled
+            scaled?.let { bmp ->
+                saveToCache(context, bmp, filePath, timeMs)
+                bmp
             }
         } catch (e: Exception) {
             Log.e(TAG, "extractAndCache failed: $cacheKey", e)
@@ -145,7 +117,7 @@ object VideoFrameCache {
                 missedIndices.add(index)
             }
         }
-        Log.d(TAG, "extractAndCacheBatch missedIndices  ${missedIndices.toString()}")
+
         if (missedIndices.isEmpty()) {
             return results.toList()
         }
@@ -154,7 +126,6 @@ object VideoFrameCache {
 
         val missedTimeMs = missedIndices.map { timeMsList[it] }
         val extractor = FrameExtractorProvider.select(context)
-        Log.d(TAG, "extractAndCacheBatch extractor  ${extractor}")
         val frames = extractor.extractFrames(
             filePath, missedTimeMs, targetWidth, targetHeight
         )
