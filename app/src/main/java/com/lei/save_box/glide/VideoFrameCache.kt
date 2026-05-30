@@ -39,6 +39,7 @@ object VideoFrameCache {
     suspend fun loadFromCache(context: Context, filePath: String, timeMs: Long): Bitmap? {
         return withContext(Dispatchers.IO) {
             val cacheFile = File(getCacheDir(context), cacheFileName(getCacheKey(filePath, timeMs)))
+            Log.d(TAG,"loadFromCache cacheFile ${cacheFile} cachekey ${getCacheKey(filePath, timeMs)}  ")
             if (cacheFile.exists()) BitmapFactory.decodeFile(cacheFile.absolutePath) else null
         }
     }
@@ -48,6 +49,7 @@ object VideoFrameCache {
             try {
                 val cacheFile = File(getCacheDir(context), cacheFileName(getCacheKey(filePath, timeMs)))
                 bitmap.compress(Bitmap.CompressFormat.PNG, 100, FileOutputStream(cacheFile))
+                Log.d(TAG,"saveToCache filePath ${filePath} cachekey ${getCacheKey(filePath, timeMs)}  ")
                 true
             } catch (_: Exception) {
                 false
