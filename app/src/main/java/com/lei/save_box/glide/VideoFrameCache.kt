@@ -2,7 +2,6 @@ package com.lei.save_box.glide
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.util.Log
 import com.bumptech.glide.Glide
@@ -151,34 +150,19 @@ object VideoFrameCache {
             return results.toList()
         }
 
-        Log.d(TAG, "extractAndCacheBatch: ${missedIndices.size}/${timeMsList.size} cache misses, batch extracting")
+        Log.d(TAG, "extractAndCacheBatch: ${missedIndices.size}/${timeMsList.size} cache misses, batch extracting with FFmpeg")
 
-        val retriever = MediaMetadataRetriever()
-        try {
-            retriever.setDataSource(filePath)
+        val missedTimeMs = missedIndices.map { timeMsList[it] }
+        val frames = FFmpegFrameExtractor.extractFrames(
+            filePath, missedTimeMs, targetWidth, targetHeight
+        )
 
-            for (index in missedIndices) {
-                val timeMs = timeMsList[index]
-                val timeUs = timeMs * 1000L
-                val rawBitmap = retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-
-                if (rawBitmap != null) {
-                    val srcW = rawBitmap.width.toFloat()
-                    val srcH = rawBitmap.height.toFloat()
-                    val scale = minOf(targetWidth.toFloat() / srcW, targetHeight.toFloat() / srcH)
-                    val scaledW = (srcW * scale).toInt().coerceAtLeast(1)
-                    val scaledH = (srcH * scale).toInt().coerceAtLeast(1)
-                    val scaled = Bitmap.createScaledBitmap(rawBitmap, scaledW, scaledH, true)
-                    if (scaled !== rawBitmap) rawBitmap.recycle()
-
-                    saveToCache(context, scaled, filePath, timeMs)
-                    results[index] = scaled
-                }
+        for ((i, index) in missedIndices.withIndex()) {
+            val bitmap = frames[i]
+            if (bitmap != null) {
+                saveToCache(context, bitmap, filePath, timeMsList[index])
+                results[index] = bitmap
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "extractAndCacheBatch failed: $filePath", e)
-        } finally {
-            try { retriever.release() } catch (_: Exception) {}
         }
 
         return results.toList()
