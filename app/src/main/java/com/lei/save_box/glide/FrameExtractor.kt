@@ -5,6 +5,8 @@ import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
 import com.lei.save_box.manager.SettingsManager
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -29,6 +31,8 @@ class FfmpegBatchExtractor : BatchFrameExtractor {
 
 class RetrieverBatchExtractor : BatchFrameExtractor {
 
+    private val threadCount = Runtime.getRuntime().availableProcessors().coerceIn(2, 8)
+
     override suspend fun extractFrames(
         filePath: String,
         timeMsList: List<Long>,
@@ -37,32 +41,42 @@ class RetrieverBatchExtractor : BatchFrameExtractor {
     ): List<Bitmap?> = withContext(Dispatchers.IO) {
         val file = File(filePath)
         if (!file.exists()) return@withContext timeMsList.map { null }
+        if (timeMsList.isEmpty()) return@withContext emptyList()
 
-        val results = Array<Bitmap?>(timeMsList.size) { null }
-        val retriever = MediaMetadataRetriever()
-        try {
-            retriever.setDataSource(filePath)
-            for ((i, timeMs) in timeMsList.withIndex()) {
-                val rawBitmap = retriever.getFrameAtTime(
-                    timeMs * 1000L,
-                    MediaMetadataRetriever.OPTION_CLOSEST_SYNC
-                )
-                if (rawBitmap != null) {
-                    val scale = minOf(
-                        targetWidth.toFloat() / rawBitmap.width,
-                        targetHeight.toFloat() / rawBitmap.height
-                    )
-                    val scaledW = (rawBitmap.width * scale).toInt().coerceAtLeast(1)
-                    val scaledH = (rawBitmap.height * scale).toInt().coerceAtLeast(1)
-                    val scaled = Bitmap.createScaledBitmap(rawBitmap, scaledW, scaledH, true)
-                    if (scaled !== rawBitmap) rawBitmap.recycle()
-                    results[i] = scaled
+        val chunkSize = (timeMsList.size + threadCount - 1) / threadCount
+        val chunks = timeMsList.withIndex().groupBy { it.index / chunkSize }.values
+
+        coroutineScope {
+            chunks.map { chunk ->
+                async {
+                    val retriever = MediaMetadataRetriever()
+                    try {
+                        retriever.setDataSource(filePath)
+                        chunk.map { (originalIndex, timeMs) ->
+                            val rawBitmap = retriever.getFrameAtTime(
+                                timeMs * 1000L,
+                                MediaMetadataRetriever.OPTION_CLOSEST_SYNC
+                            )
+                            originalIndex to if (rawBitmap != null) {
+                                val scale = minOf(
+                                    targetWidth.toFloat() / rawBitmap.width,
+                                    targetHeight.toFloat() / rawBitmap.height
+                                )
+                                val scaledW = (rawBitmap.width * scale).toInt().coerceAtLeast(1)
+                                val scaledH = (rawBitmap.height * scale).toInt().coerceAtLeast(1)
+                                val scaled = Bitmap.createScaledBitmap(rawBitmap, scaledW, scaledH, true)
+                                if (scaled !== rawBitmap) rawBitmap.recycle()
+                                scaled
+                            } else null
+                        }
+                    } finally {
+                        try { retriever.release() } catch (_: Exception) {}
+                    }
                 }
-            }
-        } finally {
-            try { retriever.release() } catch (_: Exception) {}
+            }.flatMap { it.await() }
+                .sortedBy { it.first }
+                .map { it.second }
         }
-        results.toList()
     }
 }
 
