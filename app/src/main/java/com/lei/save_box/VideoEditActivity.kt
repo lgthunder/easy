@@ -31,8 +31,8 @@ class VideoEditActivity : AppCompatActivity() {
     private var originalEnd: Long = 0
     private var sourcePath: String = ""
 
-    private val thumbnailThCount = 20
     private val thumbnailHeightDp = 60
+    private val thumbnailCellWidthPx = 120f
     lateinit var oriFile :File
     val retriever = MediaMetadataRetriever()
 
@@ -84,7 +84,6 @@ class VideoEditActivity : AppCompatActivity() {
         binding.playerView.player = p
         binding.playerView.useController = false
 
-        binding.trimRangeView.thumbnailCount = thumbnailThCount
         binding.trimRangeView.thumbnailHeight = thumbnailHeightDp * resources.displayMetrics.density
 
         val file = File(sourcePath)
@@ -127,8 +126,15 @@ class VideoEditActivity : AppCompatActivity() {
         try { retriever.setDataSource(sourcePath) } catch (_: Exception) {}
     }
 
+    private fun computeThumbnailCount(): Int {
+        val viewWidth = binding.trimRangeView.width
+        if (viewWidth <= 0) return 20
+        return (viewWidth / thumbnailCellWidthPx).toInt().coerceIn(10, 60)
+    }
+
     private fun generateThumbnails(file: File, durationMs: Long) {
-        val count = thumbnailThCount
+        val count = computeThumbnailCount()
+        binding.trimRangeView.thumbnailCount = count
         val interval = durationMs / count
         if (interval <= 0) return
 
@@ -250,7 +256,7 @@ class VideoEditActivity : AppCompatActivity() {
                 if (startMs == 0L && endMs == totalDuration) {
                     generateThumbnails(videoFile, totalDuration)
                 } else {
-                    val thumbCount = (binding.trimRangeView.width / 6).coerceIn(2, 20)
+                    val thumbCount = computeThumbnailCount()
                     generateThumbnailsForRange(videoFile, startMs, endMs, thumbCount)
                 }
             }
