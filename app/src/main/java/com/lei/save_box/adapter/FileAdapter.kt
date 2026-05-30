@@ -17,7 +17,9 @@ import java.util.Date
 import java.util.Locale
 
 class FileAdapter(
-    private val onItemClick: (FileItem) -> Unit,
+    private val onFileClick: (FileItem) -> Unit,
+    private val onFolderClick: (FileItem) -> Unit,
+    private val onItemLongClick: (FileItem) -> Unit,
     private val onSelectionChanged: (Int) -> Unit
 ) : ListAdapter<FileItem, FileAdapter.ViewHolder>(DiffCallback) {
 
@@ -73,37 +75,44 @@ class FileAdapter(
 
         fun bind(item: FileItem, position: Int, selectionMode: Boolean, isSelected: Boolean) {
             binding.tvFileName.text = item.name
-            binding.tvFileSize.text = item.formattedSize
-            binding.tvFileDate.text = dateFormat.format(Date(item.lastModified))
 
-            val file = File(item.path)
-            when {
-                item.isImage -> {
-                    Glide.with(binding.ivFileIcon.context)
-                        .load(file)
-                        .override(96, 96)
-                        .transition(DrawableTransitionOptions.withCrossFade())
-                        .diskCacheStrategy(DiskCacheStrategy.ALL)
-                        .into(binding.ivFileIcon)
-                }
-                item.isVideo -> {
-                    Glide.with(binding.ivFileIcon.context)
-                        .asBitmap()
-                        .load(VideoThumbnail(item.path,0))
-                        .override(96, 96)
-                        .centerCrop()
-                        .placeholder(android.R.drawable.ic_media_play)
-                        .error(android.R.drawable.ic_media_play)
-                        .diskCacheStrategy(DiskCacheStrategy.ALL)
-                        .into(binding.ivFileIcon)
-                }
-                else -> {
-                    val iconRes = when {
-                        item.isAudio -> android.R.drawable.ic_media_play
-                        item.isDocument -> android.R.drawable.ic_menu_edit
-                        else -> android.R.drawable.ic_menu_save
+            if (item.isDirectory) {
+                binding.tvFileSize.text = ""
+                binding.tvFileDate.text = dateFormat.format(Date(item.lastModified))
+                binding.ivFileIcon.setImageResource(android.R.drawable.ic_menu_upload)
+            } else {
+                binding.tvFileSize.text = item.formattedSize
+                binding.tvFileDate.text = dateFormat.format(Date(item.lastModified))
+
+                val file = File(item.path)
+                when {
+                    item.isImage -> {
+                        Glide.with(binding.ivFileIcon.context)
+                            .load(file)
+                            .override(96, 96)
+                            .transition(DrawableTransitionOptions.withCrossFade())
+                            .diskCacheStrategy(DiskCacheStrategy.ALL)
+                            .into(binding.ivFileIcon)
                     }
-                    binding.ivFileIcon.setImageResource(iconRes)
+                    item.isVideo -> {
+                        Glide.with(binding.ivFileIcon.context)
+                            .asBitmap()
+                            .load(VideoThumbnail(item.path, 0))
+                            .override(96, 96)
+                            .centerCrop()
+                            .placeholder(android.R.drawable.ic_media_play)
+                            .error(android.R.drawable.ic_media_play)
+                            .diskCacheStrategy(DiskCacheStrategy.ALL)
+                            .into(binding.ivFileIcon)
+                    }
+                    else -> {
+                        val iconRes = when {
+                            item.isAudio -> android.R.drawable.ic_media_play
+                            item.isDocument -> android.R.drawable.ic_menu_edit
+                            else -> android.R.drawable.ic_menu_save
+                        }
+                        binding.ivFileIcon.setImageResource(iconRes)
+                    }
                 }
             }
 
@@ -117,7 +126,7 @@ class FileAdapter(
 
             binding.root.setOnLongClickListener {
                 if (!isSelectionMode) {
-                    enterSelectionMode(bindingAdapterPosition)
+                    onItemLongClick(item)
                 }
                 true
             }
@@ -126,7 +135,11 @@ class FileAdapter(
                 if (isSelectionMode) {
                     toggleSelection(bindingAdapterPosition)
                 } else {
-                    onItemClick(item)
+                    if (item.isDirectory) {
+                        onFolderClick(item)
+                    } else {
+                        onFileClick(item)
+                    }
                 }
             }
         }

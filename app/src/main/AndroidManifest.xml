@@ -60,6 +60,11 @@
             android:theme="@style/Theme.Save_box.FullScreen" />
 
         <activity
+            android:name=".TrashActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Save_box.FullScreen" />
+
+        <activity
             android:name=".VideoEditActivity"
             android:exported="false"
             android:theme="@style/Theme.Save_box.FullScreen" />

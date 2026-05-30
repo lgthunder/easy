@@ -41,7 +41,7 @@ class VideoEditActivity : AppCompatActivity() {
     private var throttleRunnable: Runnable? = null
     private var lastCallTimeMs: Long = 0
 
-    private val speedOptions = arrayOf(0.5f, 1f, 1.25f, 1.5f, 2f)
+    private val speedOptions = arrayOf(0.5f,0.75f, 1f, 1.25f, 1.5f, 2f,3f,5f)
     private var currentSpeedIndex = 1
 
     private val positionHandler = Handler(Looper.getMainLooper())

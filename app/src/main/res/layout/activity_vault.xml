@@ -5,10 +5,42 @@
     android:layout_height="match_parent"
     android:background="@android:color/white">
 
+    <LinearLayout
+        android:id="@+id/layoutNavBar"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:background="#F5F5F5"
+        android:visibility="gone">
+
+        <ImageButton
+            android:id="@+id/btnBack"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/cancel"
+            android:src="@android:drawable/ic_menu_revert" />
+
+        <TextView
+            android:id="@+id/tvCurrentPath"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="start"
+            android:maxLines="1"
+            android:textColor="@android:color/black"
+            android:textSize="14sp" />
+
+    </LinearLayout>
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvFiles"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:layout_marginTop="0dp"
         android:clipToPadding="false"
         android:paddingBottom="80dp" />
 
@@ -18,7 +50,6 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:visibility="gone" />
-
 
     <com.google.android.material.chip.Chip
         android:id="@+id/chipSelectionCount"
@@ -41,6 +72,34 @@
         android:contentDescription="@string/menu"
         android:src="@android:drawable/ic_menu_more"
         app:tint="@android:color/white"
+        app:fabSize="mini" />
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabRename"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="140dp"
+        android:contentDescription="@string/rename"
+        android:src="@android:drawable/ic_menu_edit"
+        android:visibility="gone"
+        app:tint="@android:color/white"
+        app:backgroundTint="#FF2196F3"
+        app:fabSize="mini" />
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabMove"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="84dp"
+        android:contentDescription="@string/move"
+        android:src="@android:drawable/ic_menu_upload"
+        android:visibility="gone"
+        app:tint="@android:color/white"
+        app:backgroundTint="#FFFF9800"
         app:fabSize="mini" />
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -69,10 +128,11 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:clipChildren="false" />
+
     <FrameLayout
         android:id="@+id/floatTask"
         android:clipChildren="false"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"></FrameLayout>
+        android:layout_height="match_parent" />
 
 </FrameLayout>

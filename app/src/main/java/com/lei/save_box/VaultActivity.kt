@@ -9,6 +9,7 @@ import android.provider.MediaStore
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
+import android.widget.EditText
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -42,6 +43,10 @@ class VaultActivity : AppCompatActivity(), LockableActivity {
     private lateinit var adapter: FileAdapter
     private var currentSortMode = SortMode.DATE_DESC
     private var taskFloatingWindow: TaskFloatingWindow? = null
+    private var currentDir: File? = null
+
+    private val isAtRoot: Boolean
+        get() = currentDir == null || currentDir == fileManager.vaultDir
 
     private val imagePickerLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -66,6 +71,12 @@ class VaultActivity : AppCompatActivity(), LockableActivity {
         }
     }
 
+    private val trashActivityLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { _ ->
+        loadFiles()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
@@ -77,9 +88,11 @@ class VaultActivity : AppCompatActivity(), LockableActivity {
         fileManager = FileManager(this)
         settingsManager = SettingsManager(this)
         floatingWindowManager = FloatingWindowManager(this, binding.floatingContainer)
+        currentDir = fileManager.vaultDir
 
         setupRecyclerView()
         setupFabs()
+        setupNavigationBar()
         loadFiles()
     }
 
@@ -90,9 +103,46 @@ class VaultActivity : AppCompatActivity(), LockableActivity {
         }
     }
 
+    private fun setupNavigationBar() {
+        binding.btnBack.setOnClickListener {
+            navigateUp()
+        }
+    }
+
+    private fun navigateUp() {
+        currentDir = currentDir?.parentFile
+        if (currentDir == null || currentDir!!.absolutePath == fileManager.vaultDir.absolutePath) {
+            currentDir = fileManager.vaultDir
+            updateNavBarVisibility()
+        }
+        if (currentDir!!.absolutePath.startsWith(fileManager.vaultDir.absolutePath)) {
+            updateNavBarVisibility()
+            adapter.exitSelectionMode()
+            loadFiles()
+        } else {
+            currentDir = fileManager.vaultDir
+            updateNavBarVisibility()
+            adapter.exitSelectionMode()
+            loadFiles()
+        }
+    }
+
+    private fun updateNavBarVisibility() {
+        if (isAtRoot) {
+            binding.layoutNavBar.visibility = View.GONE
+        } else {
+            binding.layoutNavBar.visibility = View.VISIBLE
+            val relativePath = currentDir!!.absolutePath.removePrefix(fileManager.vaultDir.absolutePath)
+                .removePrefix("/").ifEmpty { "/" }
+            binding.tvCurrentPath.text = relativePath
+        }
+    }
+
     private fun setupRecyclerView() {
         adapter = FileAdapter(
-            onItemClick = { item -> onFileClick(item) },
+            onFileClick = { item -> onFileClick(item) },
+            onFolderClick = { item -> navigateToFolder(item) },
+            onItemLongClick = { item -> showItemActions(item) },
             onSelectionChanged = { count -> onSelectionCountChanged(count) }
         )
 
@@ -104,6 +154,8 @@ class VaultActivity : AppCompatActivity(), LockableActivity {
         binding.fabImport.setOnClickListener { showImportDialog() }
         binding.fabMenu.setOnClickListener { showMenuDialog() }
         binding.fabDelete.setOnClickListener { deleteSelectedFiles() }
+        binding.fabRename.setOnClickListener { renameSelectedFile() }
+        binding.fabMove.setOnClickListener { moveSelectedFiles() }
     }
 
     private fun onSelectionCountChanged(count: Int) {
@@ -112,17 +164,156 @@ class VaultActivity : AppCompatActivity(), LockableActivity {
             binding.chipSelectionCount.text = getString(R.string.selected_count, count)
             binding.fabImport.visibility = View.GONE
             binding.fabMenu.visibility = View.GONE
+
+            if (count == 1) {
+                binding.fabRename.visibility = View.VISIBLE
+            } else {
+                binding.fabRename.visibility = View.GONE
+            }
+            binding.fabMove.visibility = View.VISIBLE
             binding.fabDelete.visibility = View.VISIBLE
         } else {
             binding.chipSelectionCount.visibility = View.GONE
             binding.fabImport.visibility = View.VISIBLE
             binding.fabMenu.visibility = View.VISIBLE
+            binding.fabRename.visibility = View.GONE
+            binding.fabMove.visibility = View.GONE
             binding.fabDelete.visibility = View.GONE
         }
     }
 
+    private fun navigateToFolder(item: FileItem) {
+        currentDir = File(item.path)
+        updateNavBarVisibility()
+        loadFiles()
+    }
+
+    private fun showItemActions(item: FileItem) {
+        val items = mutableListOf(
+            getString(R.string.rename),
+            getString(R.string.move)
+        )
+        if (!item.isDirectory) {
+            items.add(getString(R.string.delete_selected))
+        } else {
+            items.add(getString(R.string.delete_selected))
+        }
+        items.add(getString(R.string.multi_select))
+
+        AlertDialog.Builder(this)
+            .setTitle(item.name)
+            .setItems(items.toTypedArray()) { _, which ->
+                when (items[which]) {
+                    getString(R.string.rename) -> showRenameDialog(item)
+                    getString(R.string.move) -> {
+                        val paths = setOf(item.path)
+                        showFolderPicker(paths) { targetPath ->
+                            moveFiles(listOf(item.path), targetPath)
+                        }
+                    }
+                    getString(R.string.delete_selected) -> confirmAndMoveToTrash(listOf(item.path))
+                    getString(R.string.multi_select) -> {
+                        val position = adapter.currentList.indexOfFirst { it.path == item.path }
+                        if (position >= 0) {
+                            adapter.enterSelectionMode(position)
+                        }
+                    }
+                }
+            }
+            .show()
+    }
+
+    private fun showRenameDialog(item: FileItem) {
+        val input = EditText(this).apply {
+            setText(item.name)
+            selectAll()
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.rename)
+            .setView(input)
+            .setPositiveButton(R.string.confirm) { _, _ ->
+                val newName = input.text.toString().trim()
+                if (newName.isEmpty() || newName == item.name) return@setPositiveButton
+                if (newName.contains("/") || newName.contains("\\")) {
+                    Toast.makeText(this, "文件名不能包含 / 或 \\", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                val ok = fileManager.renameFile(item.path, newName)
+                if (ok) {
+                    Toast.makeText(this, R.string.rename_success, Toast.LENGTH_SHORT).show()
+                    loadFiles()
+                } else {
+                    Toast.makeText(this, R.string.rename_exists, Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun renameSelectedFile() {
+        val selected = adapter.getSelectedItems()
+        if (selected.size != 1) return
+        showRenameDialog(selected.first())
+        adapter.exitSelectionMode()
+    }
+
+    private fun moveSelectedFiles() {
+        val selected = adapter.getSelectedItems()
+        if (selected.isEmpty()) return
+        val paths = selected.map { it.path }.toSet()
+        showFolderPicker(paths) { targetPath ->
+            moveFiles(selected.map { it.path }, targetPath)
+            adapter.exitSelectionMode()
+        }
+    }
+
+    private fun moveFiles(paths: List<String>, targetDirPath: String) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val count = fileManager.moveFiles(paths, targetDirPath)
+            withContext(Dispatchers.Main) {
+                if (count > 0) {
+                    Toast.makeText(this@VaultActivity, getString(R.string.move_success, count), Toast.LENGTH_SHORT).show()
+                }
+                loadFiles()
+            }
+        }
+    }
+
+    private fun showFolderPicker(excludePaths: Set<String>, onFolderSelected: (String) -> Unit) {
+        val dirs = mutableListOf(getString(R.string.move_root))
+        dirs.addAll(
+            fileManager.listAllDirs().map { dirPath ->
+                dirPath.removePrefix(fileManager.vaultDir.absolutePath).removePrefix("/").ifEmpty { "/" }
+            }
+        )
+
+        val dirAbsolutePaths = listOf(fileManager.vaultDir.absolutePath) + fileManager.listAllDirs()
+
+        val filteredIndices = mutableListOf<Int>()
+        val filteredDirs = mutableListOf<String>()
+
+        for (i in dirs.indices) {
+            val absPath = dirAbsolutePaths[i]
+            if (absPath !in excludePaths) {
+                filteredDirs.add(dirs[i])
+                filteredIndices.add(i)
+            }
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle(R.string.move_select_folder)
+            .setItems(filteredDirs.toTypedArray()) { _, which ->
+                val targetPath = dirAbsolutePaths[filteredIndices[which]]
+                onFolderSelected(targetPath)
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
     private fun showMenuDialog() {
         val items = arrayOf(
+            getString(R.string.new_folder),
+            getString(R.string.trash),
             getString(R.string.sort_by_name),
             getString(R.string.sort_by_date),
             getString(R.string.sort_by_size),
@@ -138,19 +329,51 @@ class VaultActivity : AppCompatActivity(), LockableActivity {
             .setTitle(R.string.menu)
             .setItems(items) { _, which ->
                 when (which) {
-                    0 -> toggleSort(SortMode.NAME_ASC, SortMode.NAME_DESC)
-                    1 -> toggleSort(SortMode.DATE_ASC, SortMode.DATE_DESC)
-                    2 -> toggleSort(SortMode.SIZE_ASC, SortMode.SIZE_DESC)
-                    3 -> toggleSort(SortMode.TYPE_ASC, SortMode.TYPE_DESC)
-                    4 -> floatingWindowManager.tileHorizontal()
-                    5 -> floatingWindowManager.tileVertical()
-                    6 -> floatingWindowManager.tileGrid()
-                    7 -> showSettingsDialog()
-                    8 -> clearGlideCache()
-                    9 -> showExitDialog()
+                    0 -> showCreateFolderDialog()
+                    1 -> openTrash()
+                    2 -> toggleSort(SortMode.NAME_ASC, SortMode.NAME_DESC)
+                    3 -> toggleSort(SortMode.DATE_ASC, SortMode.DATE_DESC)
+                    4 -> toggleSort(SortMode.SIZE_ASC, SortMode.SIZE_DESC)
+                    5 -> toggleSort(SortMode.TYPE_ASC, SortMode.TYPE_DESC)
+                    6 -> floatingWindowManager.tileHorizontal()
+                    7 -> floatingWindowManager.tileVertical()
+                    8 -> floatingWindowManager.tileGrid()
+                    9 -> showSettingsDialog()
+                    10 -> clearGlideCache()
+                    11 -> showExitDialog()
                 }
             }
             .show()
+    }
+
+    private fun showCreateFolderDialog() {
+        val input = EditText(this).apply {
+            hint = getString(R.string.folder_name_hint)
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.new_folder)
+            .setView(input)
+            .setPositiveButton(R.string.confirm) { _, _ ->
+                val name = input.text.toString().trim()
+                if (name.isEmpty()) return@setPositiveButton
+                if (name.contains("/") || name.contains("\\")) {
+                    Toast.makeText(this, "文件夹名不能包含 / 或 \\", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                val ok = fileManager.createFolder(currentDir!!.absolutePath, name)
+                if (ok) {
+                    loadFiles()
+                } else {
+                    Toast.makeText(this, R.string.folder_exists, Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun openTrash() {
+        val intent = Intent(this, TrashActivity::class.java)
+        trashActivityLauncher.launch(intent)
     }
 
     private fun toggleSort(asc: SortMode, desc: SortMode) {
@@ -202,6 +425,7 @@ class VaultActivity : AppCompatActivity(), LockableActivity {
         val helper = ProgressDialogHelper(this)
         val total = uris.size
         val mainHandler = Handler(Looper.getMainLooper())
+        val targetDir = currentDir ?: fileManager.vaultDir
 
         lifecycleScope.launch(Dispatchers.IO) {
             withContext(Dispatchers.Main) {
@@ -212,7 +436,7 @@ class VaultActivity : AppCompatActivity(), LockableActivity {
                 withContext(Dispatchers.Main) {
                     helper.updateProgress(0, "$successCount / $total")
                 }
-                val ok = fileManager.copyToVault(uri) { progress ->
+                val ok = fileManager.copyToVault(uri, targetDir = targetDir) { progress ->
                     mainHandler.post {
                         helper.updateProgress(progress, "$successCount / $total")
                     }
@@ -233,8 +457,9 @@ class VaultActivity : AppCompatActivity(), LockableActivity {
     }
 
     private fun loadFiles() {
+        val dir = currentDir ?: fileManager.vaultDir
         lifecycleScope.launch(Dispatchers.IO) {
-            val files = fileManager.listFiles(currentSortMode)
+            val files = fileManager.listFiles(directory = dir, sortMode = currentSortMode)
             withContext(Dispatchers.Main) {
                 adapter.submitList(files)
                 updateEmptyView(files.isEmpty())
@@ -313,23 +538,30 @@ class VaultActivity : AppCompatActivity(), LockableActivity {
         val selectedItems = adapter.getSelectedItems()
         if (selectedItems.isEmpty()) return
 
+        confirmAndMoveToTrash(selectedItems.map { it.path })
+        adapter.exitSelectionMode()
+    }
+
+    private fun confirmAndMoveToTrash(paths: List<String>) {
+        if (paths.isEmpty()) return
+
+        val names = paths.map { File(it).name }
+        val displayNames = if (names.size <= 3) {
+            names.joinToString("\n")
+        } else {
+            names.take(3).joinToString("\n") + "\n...等共 ${names.size} 个文件"
+        }
+
         AlertDialog.Builder(this)
             .setTitle(R.string.confirm_delete_title)
-            .setMessage(getString(R.string.confirm_delete_message, selectedItems.size))
+            .setMessage(getString(R.string.confirm_trash_message, displayNames))
             .setPositiveButton(R.string.confirm) { _, _ ->
-                val paths = selectedItems.map { it.path }
-                val helper = ProgressDialogHelper(this@VaultActivity)
                 lifecycleScope.launch(Dispatchers.IO) {
+                    val count = fileManager.moveToTrash(paths)
                     withContext(Dispatchers.Main) {
-                        helper.show(getString(R.string.deleting_files), paths.size)
-                    }
-                    val deletedCount = fileManager.deleteFiles(paths)
-                    withContext(Dispatchers.Main) {
-                        helper.dismiss()
-                        if (deletedCount > 0) {
-                            Toast.makeText(this@VaultActivity, "已删除 $deletedCount 个文件", Toast.LENGTH_SHORT).show()
+                        if (count > 0) {
+                            Toast.makeText(this@VaultActivity, R.string.trash_move_success, Toast.LENGTH_SHORT).show()
                         }
-                        adapter.exitSelectionMode()
                         loadFiles()
                     }
                 }
@@ -341,6 +573,11 @@ class VaultActivity : AppCompatActivity(), LockableActivity {
     override fun onBackPressed() {
         if (adapter.isSelectionMode) {
             adapter.exitSelectionMode()
+            return
+        }
+
+        if (!isAtRoot) {
+            navigateUp()
             return
         }
 
@@ -378,9 +615,6 @@ class VaultActivity : AppCompatActivity(), LockableActivity {
             taskFloatingWindow = TaskFloatingWindow(this)
             taskFloatingWindow?.attachTo(binding.floatTask)
         }
-        val manager = BackgroundTaskManager.getInstance()
-//        if (manager.activeCount > 0 || manager.tasks.isNotEmpty()) {
-            taskFloatingWindow?.show()
-//        }
+        taskFloatingWindow?.show()
     }
 }
