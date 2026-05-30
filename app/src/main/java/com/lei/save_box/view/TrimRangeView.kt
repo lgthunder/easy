@@ -67,6 +67,7 @@ class TrimRangeView @JvmOverloads constructor(
             field = value
             startMs = 0
             endMs = value
+            zoomScale = zoomScale.coerceIn(minZoom, maxZoom)
             invalidate()
         }
 
@@ -91,7 +92,11 @@ class TrimRangeView @JvmOverloads constructor(
     private var viewCenterMs: Long = 0L
     private var zoomAnchorMs: Long = 0L
     private val minZoom: Float = 1f
-    private val maxZoom: Float = 5f
+    private val maxZoom: Float
+        get() {
+            if (durationMs <= 0) return 5f
+            return (durationMs.toFloat() / MIN_VISIBLE_DURATION_MS).coerceIn(5f, 200f)
+        }
     private val isZoomed: Boolean get() = zoomScale > 1.01f
 
     private val scaleDetector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
@@ -159,6 +164,7 @@ class TrimRangeView @JvmOverloads constructor(
         private const val DRAG_START = 1
         private const val DRAG_END = 2
         private const val DRAG_POSITION = 3
+        private const val MIN_VISIBLE_DURATION_MS = 60_000L
     }
 
     fun setRange(start: Long, end: Long) {
@@ -201,7 +207,7 @@ class TrimRangeView @JvmOverloads constructor(
                 drawZoomHandle(canvas, startX, trackCenterY)
                 drawZoomHandle(canvas, endX, trackCenterY)
 
-                val zoomText = "${zoomScale.toInt()}x"
+                val zoomText = "%.1fx".format(zoomScale)
                 val zoomTextWidth = positionTextPaint.measureText(zoomText)
                 positionTextPaint.color = 0xCC000000.toInt()
                 canvas.drawRect(4f, trackTop - textHeight - textMargin, 4f + zoomTextWidth + 8f, trackTop, positionTextPaint)
