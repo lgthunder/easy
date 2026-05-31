@@ -139,8 +139,8 @@ class VideoEditActivity : AppCompatActivity() {
         if (interval <= 0) return
 
         lifecycleScope.launch(Dispatchers.IO) {
-            val thumbH = (thumbnailHeightDp * resources.displayMetrics.density * 2).toInt()
-            val thumbW = (thumbnailHeightDp * resources.displayMetrics.density * 2).toInt()
+            val thumbH = (thumbnailHeightDp * resources.displayMetrics.density * 1).toInt()
+            val thumbW = (thumbnailHeightDp * resources.displayMetrics.density * 1).toInt()
             val timeMsList = (0 until count).map { interval * it + interval / 2 }
 
             val results = VideoFrameCache.extractAndCacheBatch(
@@ -166,8 +166,8 @@ class VideoEditActivity : AppCompatActivity() {
         if (interval <= 0) return
 
         lifecycleScope.launch(Dispatchers.IO) {
-            val thumbH = (thumbnailHeightDp * resources.displayMetrics.density * 2).toInt()
-            val thumbW = (thumbnailHeightDp * resources.displayMetrics.density * 2).toInt()
+            val thumbH = (thumbnailHeightDp * resources.displayMetrics.density * 1).toInt()
+            val thumbW = (thumbnailHeightDp * resources.displayMetrics.density * 1).toInt()
             val timeMsList = (0 until thumbCount).map { startMs + interval * it + interval / 2 }
 
             val results = VideoFrameCache.extractAndCacheBatch(
