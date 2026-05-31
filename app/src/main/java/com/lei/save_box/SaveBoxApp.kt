@@ -3,6 +3,7 @@ package com.lei.save_box
 import android.app.Application
 import android.util.Log
 import com.arthenica.ffmpegkit.FFmpegKit
+import com.lei.save_box.glide.FFmpegLogger
 import com.lei.save_box.manager.AppLockManager
 import com.lei.save_box.manager.BackgroundTaskManager
 
@@ -16,9 +17,14 @@ class SaveBoxApp : Application() {
         BackgroundTaskManager.init(this)
         AppLockManager.init(this)
         
+        // 初始化 FFmpegLogger
+        FFmpegLogger.init(this)
+        
         // 初始化 FFmpegKit
         val session = FFmpegKit.execute("-version")
         Log.d("FFmpeg", "FFmpeg initialized: ${session.returnCode}")
+        FFmpegLogger.d("FFmpegKit version check: ${session.returnCode}")
+        
         APP = this;
     }
 }

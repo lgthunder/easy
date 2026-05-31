@@ -3,4 +3,7 @@
     <files-path
         name="vault_files"
         path="vault/" />
+    <files-path
+        name="ffmpeg_logs"
+        path="ffmpeg_logs/" />
 </paths>

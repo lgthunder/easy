@@ -24,7 +24,12 @@ class FfmpegBatchExtractor : BatchFrameExtractor {
         timeMsList: List<Long>,
         targetWidth: Int,
         targetHeight: Int
-    ): List<Bitmap?> = FFmpegFrameExtractor.extractFrames(filePath, timeMsList, targetWidth, targetHeight)
+    ): List<Bitmap?> {
+        FFmpegLogger.d("[FfmpegBatchExtractor] extractFrames called: file=$filePath, frames=${timeMsList.size}")
+        val result = FFmpegFrameExtractor.extractFrames(filePath, timeMsList, targetWidth, targetHeight)
+        FFmpegLogger.d("[FfmpegBatchExtractor] extractFrames completed: ${result.count { it != null }}/${timeMsList.size} success")
+        return result
+    }
 }
 
 class RetrieverBatchExtractor : BatchFrameExtractor {
@@ -67,18 +72,30 @@ object FrameExtractorProvider {
 
     fun select(context: Context): BatchFrameExtractor {
         val settings = SettingsManager(context)
+        FFmpegLogger.d("[FrameExtractorProvider] select called: useFFmpeg=${settings.useFFmpeg}, cached=$useRetriever")
+        
         if (!settings.useFFmpeg) {
+            FFmpegLogger.d("[FrameExtractorProvider] Using RetrieverBatchExtractor (disabled in settings)")
             return RetrieverBatchExtractor()
         }
         if (useRetriever == null) {
             val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
             useRetriever = prefs.getBoolean(KEY_USE_RETRIEVER, false)
         }
-        return if (useRetriever == true) RetrieverBatchExtractor() else FfmpegBatchExtractor()
+        
+        val extractor = if (useRetriever == true) {
+            RetrieverBatchExtractor()
+        } else {
+            FfmpegBatchExtractor()
+        }
+        
+        FFmpegLogger.d("[FrameExtractorProvider] Selected: ${extractor::class.simpleName}")
+        return extractor
     }
 
     private fun markSlow(context: Context) {
         useRetriever = true
+        FFmpegLogger.w("[FrameExtractorProvider] Marking FFmpeg as slow, switching to Retriever")
         context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
             .edit().putBoolean(KEY_USE_RETRIEVER, true).apply()
     }
@@ -91,17 +108,31 @@ object FrameExtractorProvider {
         targetHeight: Int
     ) {
         val settings = SettingsManager(context)
-        if (!settings.useFFmpeg) return
-        if (useRetriever != null) return
+        FFmpegLogger.d("[FrameExtractorProvider] benchmarkAndDecide called")
+        
+        if (!settings.useFFmpeg) {
+            FFmpegLogger.d("[FrameExtractorProvider] Skipping benchmark (FFmpeg disabled)")
+            return
+        }
+        if (useRetriever != null) {
+            FFmpegLogger.d("[FrameExtractorProvider] Skipping benchmark (already decided: $useRetriever)")
+            return
+        }
 
         val start = System.currentTimeMillis()
+        FFmpegLogger.d("[FrameExtractorProvider] Starting benchmark with ${timeMsList.size} frames...")
+        
         runBlocking {
             FFmpegFrameExtractor.extractFrames(filePath, timeMsList, targetWidth, targetHeight)
         }
+        
         val elapsed = System.currentTimeMillis() - start
+        FFmpegLogger.d("[FrameExtractorProvider] Benchmark completed in ${elapsed}ms (threshold: ${SLOW_THRESHOLD_MS}ms)")
 
         if (elapsed > SLOW_THRESHOLD_MS) {
             markSlow(context)
+        } else {
+            FFmpegLogger.d("[FrameExtractorProvider] FFmpeg is fast enough, keeping as is")
         }
     }
 }

@@ -88,4 +88,5 @@
     <string name="task_list_title">任务列表</string>
     <string name="clear_cache">清理缓存</string>
     <string name="cache_cleared">缓存已清理</string>
+    <string name="view_ffmpeg_log">查看 FFmpeg 日志</string>
 </resources>

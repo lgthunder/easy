@@ -21,6 +21,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.bumptech.glide.Glide
 import com.lei.save_box.adapter.FileAdapter
 import com.lei.save_box.databinding.ActivityVaultBinding
+import com.lei.save_box.glide.FFmpegLogger
 import com.lei.save_box.manager.BackgroundTaskManager
 import com.lei.save_box.manager.BackupManager
 import com.lei.save_box.manager.FileManager
@@ -87,6 +88,12 @@ class VaultActivity : AppCompatActivity(), LockableActivity {
             backupImportUri = it
             showImportPasswordDialog()
         }
+    }
+
+    private val viewLogLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { _ ->
+        // nothing to do
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -338,6 +345,7 @@ class VaultActivity : AppCompatActivity(), LockableActivity {
             getString(R.string.tile_grid),
             getString(R.string.settings),
             getString(R.string.clear_cache),
+            getString(R.string.view_ffmpeg_log),
             getString(R.string.exit_app)
         )
         AlertDialog.Builder(this)
@@ -357,10 +365,30 @@ class VaultActivity : AppCompatActivity(), LockableActivity {
                     10 -> floatingWindowManager.tileGrid()
                     11 -> showSettingsDialog()
                     12 -> clearGlideCache()
-                    13 -> showExitDialog()
+                    13 -> viewFFmpegLog()
+                    14 -> showExitDialog()
                 }
             }
             .show()
+    }
+
+    private fun viewFFmpegLog() {
+        val logFile = FFmpegLogger.getLogFile()
+        if (logFile == null || !logFile.exists()) {
+            Toast.makeText(this, "日志文件不存在", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        try {
+            val uri = FileProvider.getUriForFile(this, "${packageName}.fileprovider", logFile)
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "text/plain")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            viewLogLauncher.launch(intent)
+        } catch (e: Exception) {
+            Toast.makeText(this, "无法打开日志文件: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun showCreateFolderDialog() {
