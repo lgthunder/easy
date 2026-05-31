@@ -40,17 +40,17 @@ object FFmpegFrameExtractor {
         FFmpegLogger.d("Input: $filePath")
         FFmpegLogger.d("TimeMsList size: ${timeMsList.size}")
         FFmpegLogger.d("Target size: ${targetWidth}x${targetHeight}")
-        FFmpegLogger.d("Output dir: ${outputDir.absolutePath}")
 
         return runCatching {
-            runBlockingInternal(filePath, timeMsList, targetWidth, targetHeight, outputDir)
+            // 直接使用逐个提取模式（更可靠）
+            extractFramesIndividually(filePath, timeMsList, targetWidth, targetHeight, outputDir)
         }.getOrElse { e ->
             FFmpegLogger.e("Exception in extractFrames", e)
             timeMsList.map { null }
         }
     }
 
-    private fun runBlockingInternal(
+    private fun extractFramesIndividually(
         filePath: String,
         timeMsList: List<Long>,
         targetWidth: Int,
@@ -59,51 +59,42 @@ object FFmpegFrameExtractor {
     ): List<Bitmap?> {
         val results = mutableListOf<Bitmap?>()
         val sortedTimeMs = timeMsList.sorted()
-        
-        FFmpegLogger.d("Processing ${sortedTimeMs.size} frames")
 
         sortedTimeMs.forEachIndexed { index, timeMs ->
             val seconds = timeMs / 1000.0
             val outPath = "${outputDir.absolutePath}/frame_${timeMs}.jpg"
             
-            FFmpegLogger.d("[${index + 1}/${sortedTimeMs.size}] Processing frame at ${timeMs}ms -> $outPath")
+            FFmpegLogger.d("[${index + 1}/${sortedTimeMs.size}] Processing frame at ${timeMs}ms")
             
             val command = "-y -ss $seconds -i \"$filePath\" -vframes 1 -vf scale=${targetWidth}:${targetHeight} \"$outPath\""
-            FFmpegLogger.d("Command[$index]: $command")
             
-            FFmpegLogger.d("Executing FFmpegKit.execute()...")
             val session = FFmpegKit.execute(command)
-            FFmpegLogger.d("FFmpegKit returned: ${session.returnCode}")
             
             if (ReturnCode.isSuccess(session.returnCode)) {
                 val outFile = File(outPath)
                 if (outFile.exists() && outFile.length() > 0) {
-                    FFmpegLogger.d("File created: ${outFile.length()} bytes")
-                    val bitmap = BitmapFactory.decodeFile(outPath)
-                    results.add(bitmap)
-                    FFmpegLogger.d("Bitmap decoded: ${bitmap != null}")
+                    results.add(BitmapFactory.decodeFile(outPath))
+                    FFmpegLogger.d("Frame[$index] at ${timeMs}ms decoded successfully")
                 } else {
                     FFmpegLogger.e("File not created or empty")
-                    FFmpegLogger.e("Session output: ${session.output}")
                     results.add(null)
                 }
             } else {
                 FFmpegLogger.e("FFmpeg failed. Code: ${session.returnCode}")
-                FFmpegLogger.e("Output: ${session.output}")
-                FFmpegLogger.e("Error stack: ${session.failStackTrace}")
                 results.add(null)
             }
         }
-        
-        val successCount = results.count { it != null }
-        FFmpegLogger.d("=== Completed: $successCount/${sortedTimeMs.size} ===")
-        
-        // Cleanup
+
+        // 清理
         try {
             outputDir.deleteRecursively()
             FFmpegLogger.d("Cleanup done")
         } catch (_: Exception) {}
-        
+
+        val successCount = results.count { it != null }
+        FFmpegLogger.d("=== Completed: $successCount/${sortedTimeMs.size} ===")
+
+        // 恢复原始顺序
         val bitmapMap = sortedTimeMs.zip(results).toMap()
         return timeMsList.map { bitmapMap[it] }
     }

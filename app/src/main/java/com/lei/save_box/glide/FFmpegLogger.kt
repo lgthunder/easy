@@ -18,6 +18,8 @@ object FFmpegLogger {
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
     
     private val lock = Any()
+
+    private var writeLog =false
     
     fun init(context: Context) {
         synchronized(lock) {
@@ -58,6 +60,7 @@ object FFmpegLogger {
     }
     
     private fun writeLog(level: String, message: String) {
+        if(!writeLog)  return
         synchronized(lock) {
             try {
                 logFile?.let { file ->

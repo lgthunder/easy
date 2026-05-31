@@ -111,9 +111,9 @@ class TrimRangeView @JvmOverloads constructor(
             zoomScale = (zoomScale * detector.scaleFactor).coerceIn(minZoom, maxZoom)
             viewCenterMs = zoomAnchorMs
             invalidate()
-            if (useFFmpeg) {
-                scheduleZoomChangedCallback()
-            }
+//            if (useFFmpeg) {
+//                scheduleZoomChangedCallback()
+//            }
             return true
         }
 
