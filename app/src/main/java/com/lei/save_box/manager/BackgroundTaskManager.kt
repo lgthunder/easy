@@ -111,9 +111,11 @@ class BackgroundTaskManager private constructor(private val app: Application) {
         _tasks.removeAll { it.id == taskId }
         storage.removeTask(taskId)
 
-        task?.let {
+        if(task?.status != TaskStatus.COMPLETED){
+         task?.let {
             val file = File(it.outputPath)
             if (file.exists()) file.delete()
+           }
         }
         cancelFlags.remove(taskId)
         notifyChanged()
