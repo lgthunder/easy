@@ -108,12 +108,15 @@ class TrimRangeView @JvmOverloads constructor(
         }
 
         override fun onScale(detector: ScaleGestureDetector): Boolean {
-            zoomScale = (zoomScale * detector.scaleFactor).coerceIn(minZoom, maxZoom)
+            val sensitivity = 2.5f
+            val scaleDelta = detector.scaleFactor - 1f
+            val adjustedScale = 1f + scaleDelta * sensitivity
+            zoomScale = (zoomScale * adjustedScale).coerceIn(minZoom, maxZoom)
             viewCenterMs = zoomAnchorMs
             invalidate()
-//            if (useFFmpeg) {
+            if (useFFmpeg) {
 //                scheduleZoomChangedCallback()
-//            }
+            }
             return true
         }
 
@@ -137,7 +140,7 @@ class TrimRangeView @JvmOverloads constructor(
         postDelayed({
             zoomChangedPending = false
             triggerZoomChanged()
-        }, 100L)
+        }, 500L)
     }
 
     private fun triggerZoomChanged() {
