@@ -78,7 +78,7 @@ object FFmpegFrameExtractor {
                     FFmpegLogger.d("[${index + 1}/${sortedTimeMs.size}] Extracting frame at ${timeMs}ms (parallel)")
                     
                     // 方案2：调整质量参数 -q:v 5（更小的文件，更快的解码）
-                    val command = "-y -ss $seconds -i \"$filePath\" -vframes 1 -q:v 5 -vf scale=${targetWidth}:${targetHeight} \"$outPath\""
+                    val command = "-y -skip_frame nokey -ss $seconds -i \"$filePath\" -vframes 1 -q:v 5 -vf scale=${targetWidth}:${targetHeight} \"$outPath\""
                     
                     val session = FFmpegKit.execute(command)
                     

@@ -1,11 +1,15 @@
 package com.lei.save_box.glide
 
+import android.R
 import android.content.Context
 import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
 import com.lei.save_box.manager.SettingsManager
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -34,32 +38,98 @@ class FfmpegBatchExtractor : BatchFrameExtractor {
 
 class RetrieverBatchExtractor : BatchFrameExtractor {
 
+//    override suspend fun extractFrames(
+//        filePath: String,
+//        timeMsList: List<Long>,
+//        targetWidth: Int,
+//        targetHeight: Int
+//    ): List<Bitmap?> = withContext(Dispatchers.IO) {
+//        val file = File(filePath)
+//        if (!file.exists()) return@withContext timeMsList.map { null }
+//
+//        val results = Array<Bitmap?>(timeMsList.size) { null }
+//        val retriever = MediaMetadataRetriever()
+//        try {
+//            retriever.setDataSource(filePath)
+//            for ((i, timeMs) in timeMsList.withIndex()) {
+//                results[i] = retriever.getScaledFrameAtTime(
+//                    timeMs * 1000L,
+//                    MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+//                    targetWidth,
+//                    targetHeight
+//                )
+//            }
+//        } finally {
+//            try { retriever.release() } catch (_: Exception) {}
+//        }
+//        results.toList()
+//    }
+
     override suspend fun extractFrames(
         filePath: String,
         timeMsList: List<Long>,
         targetWidth: Int,
         targetHeight: Int
-    ): List<Bitmap?> = withContext(Dispatchers.IO) {
-        val file = File(filePath)
-        if (!file.exists()) return@withContext timeMsList.map { null }
-
-        val results = Array<Bitmap?>(timeMsList.size) { null }
-        val retriever = MediaMetadataRetriever()
-        try {
-            retriever.setDataSource(filePath)
-            for ((i, timeMs) in timeMsList.withIndex()) {
-                results[i] = retriever.getScaledFrameAtTime(
-                    timeMs * 1000L,
-                    MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
-                    targetWidth,
-                    targetHeight
-                )
-            }
-        } finally {
-            try { retriever.release() } catch (_: Exception) {}
-        }
-        results.toList()
+    ): List<Bitmap?> =withContext(Dispatchers.IO){
+             extractFramesParallel(filePath,timeMsList)
     }
+
+
+    // 限制最大并行任务数为 4
+    private val semaphore = Semaphore(4)
+
+    /**
+     * 并行提取指定时间点的视频帧
+     * @param videoUri 视频URI
+     * @param timePointsMs 要提取的时间点列表 (单位: 毫秒)
+     * @return 成功提取的 Bitmap 列表，顺序与原列表相同，失败位置为 null
+     */
+    suspend fun extractFramesParallel(
+        videoUri: String,
+        timePointsMs: List<Long>
+    ): List<Bitmap?> = withContext(Dispatchers.IO) {
+
+        // 为每个时间点创建一个并发任务
+        val deferredResults = timePointsMs.map { timeMs ->
+            async {
+                // 获取信号量，如果当前并发数已达上限，此处会挂起等待
+                semaphore.acquire()
+                try {
+                    extractFrameAtTime(videoUri, timeMs)
+                } finally {
+                    // 任务结束，释放信号量
+                    semaphore.release()
+                }
+            }
+        }
+
+        // 等待所有任务完成并返回结果
+        deferredResults.awaitAll()
+    }
+
+    // 实际的抽帧逻辑，每个实例独立，运行在IO线程
+    private fun extractFrameAtTime(videoUri: String, timeMs: Long): Bitmap? {
+        var retriever: MediaMetadataRetriever? = null
+        return try {
+            retriever = MediaMetadataRetriever().apply {
+                setDataSource( videoUri)
+            }
+            // 使用 OPTION_CLOSEST_SYNC 获取最近的关键帧，速度最快
+            // 如需更精确，可改用 OPTION_CLOSEST (Android 10+)
+            retriever?.getFrameAtTime(
+                timeMs * 1000, // 注意：参数单位是微秒 (μs)
+                MediaMetadataRetriever.OPTION_CLOSEST_SYNC
+            )
+        } catch (e: Exception) {
+            // 记录错误日志
+            e.printStackTrace()
+            null
+        } finally {
+            retriever?.release()
+        }
+    }
+
+
 }
 
 object FrameExtractorProvider {
