@@ -1,6 +1,7 @@
 package com.lei.save_box.glide
 
 import com.arthenica.ffmpegkit.FFmpegKit
+import com.arthenica.ffmpegkit.FFprobeKit
 import com.arthenica.ffmpegkit.ReturnCode
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
@@ -27,7 +28,7 @@ object KeyframeIndex {
             
             FFmpegLogger.d("Executing FFmpeg keyframe detection")
             val session = FFmpegKit.execute(command)
-            
+
             if (ReturnCode.isSuccess(session.returnCode)) {
                 val output = session.output ?: ""
                 val lines = output.split("\n")
@@ -53,6 +54,71 @@ object KeyframeIndex {
             FFmpegLogger.e("Error building keyframe index", e)
         }
         
+        return keyframes
+    }
+
+
+
+    fun buildIndexFast(filePath: String): List<Long> {
+        FFmpegLogger.d("Building keyframe index (fast) for: $filePath")
+
+        val file = File(filePath)
+        if (!file.exists()) {
+            FFmpegLogger.e("File not found: $filePath")
+            return emptyList()
+        }
+
+        val cached = indexCache[filePath]
+        if (cached != null) {
+            return cached
+        }
+
+        val keyframes = mutableListOf<Long>()
+
+        try {
+            // ✅ 使用 ffprobe 直接读取容器信息，不解码（快10-100倍）
+            val command = arrayOf(
+                "-v", "quiet",
+                "-select_streams", "v:0",
+                "-show_entries", "packet=pts_time,flags",
+                "-of", "csv=p=0",
+                filePath
+            )
+
+            FFmpegLogger.d("Executing ffprobe: ${command.joinToString(" ")}")
+
+            val session = FFprobeKit.executeWithArguments(command)
+
+            if (ReturnCode.isSuccess(session.returnCode)) {
+                val output = session.output ?: ""
+                val lines = output.split("\n")
+
+                for (line in lines) {
+                    val trimmed = line.trim()
+                    if (trimmed.isNotEmpty()) {
+                        val parts = trimmed.split(",")
+                        if (parts.size >= 2) {
+                            val ptsTime = parts[0].toDoubleOrNull()
+                            val flags = parts[1]
+                            // K 表示关键帧（Key frame）
+                            if (ptsTime != null && flags.contains("K")) {
+                                val timeMs = (ptsTime * 1000).toLong()
+                                keyframes.add(timeMs)
+                            }
+                        }
+                    }
+                }
+
+                keyframes.sort()
+                FFmpegLogger.d("Found ${keyframes.size} keyframes via ffprobe")
+                indexCache[filePath] = keyframes
+            } else {
+                FFmpegLogger.e("ffprobe failed with code: ${session.returnCode}")
+            }
+        } catch (e: Exception) {
+            FFmpegLogger.e("Error building keyframe index", e)
+        }
+
         return keyframes
     }
 

@@ -137,7 +137,7 @@ class VideoEditActivity : AppCompatActivity() {
         // 并行执行：构建关键帧索引
         lifecycleScope.launch(Dispatchers.IO) {
             Log.d("leiting", "Building keyframe index...")
-            keyframeIndex = KeyframeIndex.buildIndex(file.absolutePath)
+            keyframeIndex = KeyframeIndex.buildIndexFast(file.absolutePath)
             keyframeIndexReady = true
             Log.d("leiting", "Keyframe index built: ${keyframeIndex.size} keyframes")
         }
