@@ -103,6 +103,17 @@ object VideoFrameCache {
         targetHeight: Int,
         timeMsList: List<Long>
     ): List<Bitmap?> {
+        return extractAndCacheBatchWithIndex(context, filePath, targetWidth, targetHeight, timeMsList, null)
+    }
+
+    suspend fun extractAndCacheBatchWithIndex(
+        context: Context,
+        filePath: String,
+        targetWidth: Int,
+        targetHeight: Int,
+        timeMsList: List<Long>,
+        keyframeIndex: List<Long>? = null
+    ): List<Bitmap?> {
         val file = File(filePath)
         if (!file.exists() || timeMsList.isEmpty()) {
             return timeMsList.map { null }
@@ -127,14 +138,22 @@ object VideoFrameCache {
         Log.d(TAG, "extractAndCacheBatch: ${missedIndices.size}/${timeMsList.size} cache misses, batch extracting")
 
         val missedTimeMs = missedIndices.map { timeMsList[it] }
-        val extractor = FrameExtractorProvider.select(context)
-        val frames = extractor.extractFrames(
-            filePath, missedTimeMs, targetWidth, targetHeight
-        )
+        
+        val frames = if (keyframeIndex != null && keyframeIndex.isNotEmpty()) {
+            Log.d(TAG, "Using keyframe index for extraction")
+            FFmpegFrameExtractor.extractFramesWithIndex(
+                filePath, missedTimeMs, targetWidth, targetHeight, keyframeIndex
+            )
+        } else {
+            val extractor = FrameExtractorProvider.select(context)
+            extractor.extractFrames(filePath, missedTimeMs, targetWidth, targetHeight)
+        }
 
-        FrameExtractorProvider.benchmarkAndDecide(
-            context, filePath, missedTimeMs, targetWidth, targetHeight
-        )
+        if (keyframeIndex == null) {
+            FrameExtractorProvider.benchmarkAndDecide(
+                context, filePath, missedTimeMs, targetWidth, targetHeight
+            )
+        }
 
         for ((i, index) in missedIndices.withIndex()) {
             val bitmap = frames[i]
@@ -159,5 +178,20 @@ object VideoFrameCache {
         val interval = (endMs - startMs) / frameCount
         val timeMsList = (0 until frameCount).map { startMs + interval * it + interval / 2 }
         return extractAndCacheBatch(context, filePath, targetWidth, targetHeight, timeMsList)
+    }
+
+    suspend fun preloadFramesWithIndex(
+        context: Context,
+        filePath: String,
+        startMs: Long,
+        endMs: Long,
+        frameCount: Int,
+        targetWidth: Int,
+        targetHeight: Int,
+        keyframeIndex: List<Long>
+    ): List<Bitmap?> {
+        val interval = (endMs - startMs) / frameCount
+        val timeMsList = (0 until frameCount).map { startMs + interval * it + interval / 2 }
+        return extractAndCacheBatchWithIndex(context, filePath, targetWidth, targetHeight, timeMsList, keyframeIndex)
     }
 }

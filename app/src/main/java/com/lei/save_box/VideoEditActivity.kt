@@ -15,6 +15,7 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.SeekParameters
 import com.lei.save_box.databinding.ActivityVideoEditBinding
+import com.lei.save_box.glide.KeyframeIndex
 import com.lei.save_box.glide.VideoFrameCache
 import com.lei.save_box.manager.BackgroundTaskManager
 import kotlinx.coroutines.Dispatchers
@@ -43,6 +44,10 @@ class VideoEditActivity : AppCompatActivity() {
 
     private val speedOptions = arrayOf(0.5f,0.75f, 1f, 1.25f, 1.5f, 2f,3f,5f)
     private var currentSpeedIndex = 1
+
+    // 关键帧索引
+    private var keyframeIndex: List<Long> = emptyList()
+    private var keyframeIndexReady = false
 
     private val positionHandler = Handler(Looper.getMainLooper())
     private val positionUpdater = object : Runnable {
@@ -101,7 +106,9 @@ class VideoEditActivity : AppCompatActivity() {
                         originalStart = 0
                         originalEnd = duration
                         updateTimeText()
-                        generateThumbnails(file, duration)
+                        
+                        // 并行构建关键帧索引和生成缩略图
+                        buildKeyframeIndexAndGenerateThumbnails(file, duration)
                     }
                     positionHandler.removeCallbacks(positionUpdater)
                     positionHandler.post(positionUpdater)
@@ -126,6 +133,19 @@ class VideoEditActivity : AppCompatActivity() {
         try { retriever.setDataSource(sourcePath) } catch (_: Exception) {}
     }
 
+    private fun buildKeyframeIndexAndGenerateThumbnails(file: File, durationMs: Long) {
+        // 并行执行：构建关键帧索引
+        lifecycleScope.launch(Dispatchers.IO) {
+            Log.d("leiting", "Building keyframe index...")
+            keyframeIndex = KeyframeIndex.buildIndex(file.absolutePath)
+            keyframeIndexReady = true
+            Log.d("leiting", "Keyframe index built: ${keyframeIndex.size} keyframes")
+        }
+
+        // 同时生成缩略图（使用现有的缓存机制）
+        generateThumbnails(file, durationMs)
+    }
+
     private fun computeThumbnailCount(): Int {
         val viewWidth = binding.trimRangeView.width
         if (viewWidth <= 0) return 20
@@ -143,13 +163,24 @@ class VideoEditActivity : AppCompatActivity() {
             val thumbW = (thumbnailHeightDp * resources.displayMetrics.density * 1).toInt()
             val timeMsList = (0 until count).map { interval * it + interval / 2 }
 
-            val results = VideoFrameCache.extractAndCacheBatch(
-                this@VideoEditActivity,
-                file.absolutePath,
-                thumbW,
-                thumbH,
-                timeMsList
-            )
+            val results = if (keyframeIndexReady && keyframeIndex.isNotEmpty()) {
+                VideoFrameCache.extractAndCacheBatchWithIndex(
+                    this@VideoEditActivity,
+                    file.absolutePath,
+                    thumbW,
+                    thumbH,
+                    timeMsList,
+                    keyframeIndex
+                )
+            } else {
+                VideoFrameCache.extractAndCacheBatch(
+                    this@VideoEditActivity,
+                    file.absolutePath,
+                    thumbW,
+                    thumbH,
+                    timeMsList
+                )
+            }
 
             val thumbs = results.filterNotNull()
 
@@ -170,13 +201,24 @@ class VideoEditActivity : AppCompatActivity() {
             val thumbW = (thumbnailHeightDp * resources.displayMetrics.density * 1).toInt()
             val timeMsList = (0 until thumbCount).map { startMs + interval * it + interval / 2 }
 
-            val results = VideoFrameCache.extractAndCacheBatch(
-                this@VideoEditActivity,
-                file.absolutePath,
-                thumbW,
-                thumbH,
-                timeMsList
-            )
+            val results = if (keyframeIndexReady && keyframeIndex.isNotEmpty()) {
+                VideoFrameCache.extractAndCacheBatchWithIndex(
+                    this@VideoEditActivity,
+                    file.absolutePath,
+                    thumbW,
+                    thumbH,
+                    timeMsList,
+                    keyframeIndex
+                )
+            } else {
+                VideoFrameCache.extractAndCacheBatch(
+                    this@VideoEditActivity,
+                    file.absolutePath,
+                    thumbW,
+                    thumbH,
+                    timeMsList
+                )
+            }
 
             val thumbs = results.filterNotNull()
 
@@ -186,9 +228,6 @@ class VideoEditActivity : AppCompatActivity() {
             }
         }
     }
-
-
-
 
     private fun setupButtons() {
         binding.btnSpeed.setOnClickListener {
@@ -224,7 +263,6 @@ class VideoEditActivity : AppCompatActivity() {
             val elapsed = now - lastCallTimeMs
             throttleRunnable?.let { throttleHandler.removeCallbacks(it) }
             if (elapsed >= 100) {
-//                getCurrentFrame(timeMs)
                 binding.trimRangeView.currentPositionMs = timeMs
                 player?.let { p ->
                     p.pause()
@@ -233,7 +271,6 @@ class VideoEditActivity : AppCompatActivity() {
                 lastCallTimeMs = now
             } else {
                 throttleRunnable = Runnable {
-//                    getCurrentFrame(timeMs)
                     binding.trimRangeView.currentPositionMs = timeMs
                     player?.let { p ->
                         p.pause()
@@ -289,7 +326,6 @@ class VideoEditActivity : AppCompatActivity() {
             saveTrimmedVideo()
         }
     }
-
 
     private fun getCurrentFrame(durationMs: Long) {
         Log.d("leiting","getCurrentFrame $durationMs")
@@ -348,6 +384,8 @@ class VideoEditActivity : AppCompatActivity() {
         player?.release()
         player = null
         retriever.release()
+        // 清理关键帧索引缓存
+        KeyframeIndex.removeFromCache(sourcePath)
     }
 
     private fun formatMs(ms: Long): String {

@@ -47,10 +47,54 @@ object FFmpegFrameExtractor {
 
         return runCatching {
             runBlocking {
-                extractFramesOptimized(filePath, timeMsList, targetWidth, targetHeight, outputDir)
+                extractFramesOptimized(filePath, timeMsList, targetWidth, targetHeight, outputDir, null)
             }
         }.getOrElse { e ->
             FFmpegLogger.e("Exception in extractFrames", e)
+            timeMsList.map { null }
+        }
+    }
+
+    fun extractFramesWithIndex(
+        filePath: String,
+        timeMsList: List<Long>,
+        targetWidth: Int,
+        targetHeight: Int,
+        keyframeIndex: List<Long>
+    ): List<Bitmap?> {
+        if (timeMsList.isEmpty()) {
+            FFmpegLogger.d("Empty timeMsList, returning empty")
+            return emptyList()
+        }
+        
+        val inputFile = File(filePath)
+        if (!inputFile.exists()) {
+            FFmpegLogger.e("Input file not found: $filePath")
+            return timeMsList.map { null }
+        }
+
+        val outputDir = File(inputFile.parentFile, "ffmpeg_frames_${System.currentTimeMillis()}")
+        if (!outputDir.exists()) {
+            val created = outputDir.mkdirs()
+            if (!created) {
+                FFmpegLogger.e("Failed to create output directory: ${outputDir.absolutePath}")
+                return timeMsList.map { null }
+            }
+        }
+
+        val startTime = System.currentTimeMillis()
+        FFmpegLogger.d("=== extractFramesWithIndex called ===")
+        FFmpegLogger.d("Input: $filePath")
+        FFmpegLogger.d("TimeMsList size: ${timeMsList.size}")
+        FFmpegLogger.d("Keyframe index size: ${keyframeIndex.size}")
+        FFmpegLogger.d("Target size: ${targetWidth}x${targetHeight}")
+
+        return runCatching {
+            runBlocking {
+                extractFramesOptimized(filePath, timeMsList, targetWidth, targetHeight, outputDir, keyframeIndex)
+            }
+        }.getOrElse { e ->
+            FFmpegLogger.e("Exception in extractFramesWithIndex", e)
             timeMsList.map { null }
         }
     }
@@ -60,11 +104,21 @@ object FFmpegFrameExtractor {
         timeMsList: List<Long>,
         targetWidth: Int,
         targetHeight: Int,
-        outputDir: File
+        outputDir: File,
+        keyframeIndex: List<Long>? = null
     ): List<Bitmap?> {
-        val sortedTimeMs = timeMsList.sorted()
+        // 如果有关键帧索引，找到最近的关键帧时间
+        val actualTimeMsList = if (keyframeIndex != null && keyframeIndex.isNotEmpty()) {
+            val mapped = timeMsList.map { KeyframeIndex.findNearestKeyframe(keyframeIndex, it) }
+            FFmpegLogger.d("Using keyframe index, mapped ${timeMsList.size} timestamps")
+            mapped
+        } else {
+            timeMsList
+        }
         
-        FFmpegLogger.d("Using fully optimized extraction (parallel FFmpeg + parallel decode + RGB_565 + q:v 5)")
+        val sortedTimeMs = actualTimeMsList.sorted()
+        
+        FFmpegLogger.d("Using fully optimized extraction (parallel FFmpeg + parallel decode + RGB_565 + q:v 5 ${if (keyframeIndex != null) "+ keyframe index" else ""})")
 
         // 第一步：并行提取所有帧（FFmpeg）
         val ffmpegStartTime = System.currentTimeMillis()
@@ -77,7 +131,7 @@ object FFmpegFrameExtractor {
                     
                     FFmpegLogger.d("[${index + 1}/${sortedTimeMs.size}] Extracting frame at ${timeMs}ms (parallel)")
                     
-                    // 方案2：调整质量参数 -q:v 5（更小的文件，更快的解码）
+                    // 使用 -skip_frame nokey 只解码关键帧，配合索引实现快速定位
                     val command = "-y -skip_frame nokey -ss $seconds -i \"$filePath\" -vframes 1 -q:v 5 -vf scale=${targetWidth}:${targetHeight} \"$outPath\""
                     
                     val session = FFmpegKit.execute(command)
@@ -109,7 +163,7 @@ object FFmpegFrameExtractor {
             filePaths.mapIndexed { index, path ->
                 async {
                     if (path != null) {
-                        // 方案1：使用 RGB_565 配置（内存减半，解码更快）
+                        // 使用 RGB_565 配置（内存减半，解码更快）
                         val options = BitmapFactory.Options().apply {
                             inPreferredConfig = Bitmap.Config.RGB_565
                         }
@@ -140,6 +194,6 @@ object FFmpegFrameExtractor {
 
         // 恢复原始顺序
         val bitmapMap = sortedTimeMs.zip(bitmaps).toMap()
-        return timeMsList.map { bitmapMap[it] }
+        return actualTimeMsList.map { bitmapMap[it] }
     }
 }
