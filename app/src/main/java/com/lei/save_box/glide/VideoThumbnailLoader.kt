@@ -4,6 +4,8 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.util.Log
+import com.arthenica.ffmpegkit.FFmpegKit
+import com.arthenica.ffmpegkit.ReturnCode
 import com.bumptech.glide.load.DataSource
 import com.bumptech.glide.load.Options
 import com.bumptech.glide.load.data.DataFetcher
@@ -61,6 +63,28 @@ class VideoThumbnailDataFetcher(
             return
         }
 
+        val targetW = width.coerceAtLeast(96)
+        val targetH = height.coerceAtLeast(96)
+
+//         策略1: 优先使用 FFmpeg 提取内嵌封面（如果存在）
+        val embeddedCover = extractEmbeddedCoverWithFFmpeg(model.filePath, targetW, targetH)
+        if (embeddedCover != null&& !isMostlyBlack(embeddedCover)) {
+            Log.d("leiting", "VideoThumbnailDataFetcher: FFmpeg 提取内嵌封面成功")
+            callback.onDataReady(embeddedCover)
+            return
+        }
+
+//         策略2: 使用 FFmpeg thumbnail 滤镜智能选择帧
+        val thumbnailBitmap = extractCoverWithFFmpegThumbnail(model.filePath, targetW, targetH)
+        if (thumbnailBitmap != null&&!isMostlyBlack(thumbnailBitmap)) {
+            Log.d("leiting", "VideoThumbnailDataFetcher: FFmpeg thumbnail 滤镜提取封面成功")
+            callback.onDataReady(thumbnailBitmap)
+            return
+        }
+
+        Log.d("leiting", "VideoThumbnailDataFetcher: FFmpeg 提取失败，降级使用 MediaMetadataRetriever")
+
+        // 策略3: 降级使用 MediaMetadataRetriever
         val retriever = MediaMetadataRetriever()
         try {
             retriever.setDataSource(model.filePath)
@@ -76,8 +100,6 @@ class VideoThumbnailDataFetcher(
             }
 
             if (rawBitmap != null) {
-                val targetW = width.coerceAtLeast(96)
-                val targetH = height.coerceAtLeast(96)
                 val srcW = rawBitmap.width.toFloat()
                 val srcH = rawBitmap.height.toFloat()
                 val scale = minOf(targetW / srcW, targetH / srcH)
@@ -99,6 +121,96 @@ class VideoThumbnailDataFetcher(
         }
     }
 
+    private fun extractEmbeddedCoverWithFFmpeg(filePath: String, targetW: Int, targetH: Int): Bitmap? {
+        return try {
+            val outputDir = File(File(filePath).parentFile, "ffmpeg_cover_${System.currentTimeMillis()}")
+            if (!outputDir.exists()) {
+                outputDir.mkdirs()
+            }
+
+            val outputPath = "${outputDir.absolutePath}/embedded_cover.jpg"
+
+            // 提取视频中的内嵌封面流（第2个流通常是封面）
+            // -map 0:v:1 选择第二个视频流（封面通常在那里）
+            // 如果封面在其他流，会返回失败，我们会降级到其他策略
+            val command = "-y -i \"$filePath\" -map 0:v:1 -frames:v 1 -vf \"scale=${targetW}:${targetH}:force_original_aspect_ratio=decrease,setsar=1\" -update 1 \"$outputPath\""
+
+            Log.d("leiting", "VideoThumbnailDataFetcher: FFmpeg 提取内嵌封面命令: $command")
+            val session = FFmpegKit.execute(command)
+
+            if (ReturnCode.isSuccess(session.returnCode)) {
+                val outputFile = File(outputPath)
+                if (outputFile.exists() && outputFile.length() > 0) {
+                    val options = BitmapFactory.Options().apply {
+                        inPreferredConfig = Bitmap.Config.RGB_565
+                    }
+                    val bitmap = BitmapFactory.decodeFile(outputPath, options)
+                    outputDir.deleteRecursively()
+
+                    if (bitmap != null) {
+                        Log.d("leiting", "VideoThumbnailDataFetcher: FFmpeg 内嵌封面提取成功: ${bitmap.width}x${bitmap.height}")
+                    }
+                    bitmap
+                } else {
+                    Log.w("leiting", "VideoThumbnailDataFetcher: FFmpeg 内嵌封面输出文件不存在或为空")
+                    outputDir.deleteRecursively()
+                    null
+                }
+            } else {
+                Log.w("leiting", "VideoThumbnailDataFetcher: FFmpeg 内嵌封面提取失败: ${session.returnCode}")
+                outputDir.deleteRecursively()
+                null
+            }
+        } catch (e: Exception) {
+            Log.e("leiting", "VideoThumbnailDataFetcher: FFmpeg 内嵌封面提取异常", e)
+            null
+        }
+    }
+
+    private fun extractCoverWithFFmpegThumbnail(filePath: String, targetW: Int, targetH: Int): Bitmap? {
+        return try {
+            val outputDir = File(File(filePath).parentFile, "ffmpeg_cover_${System.currentTimeMillis()}")
+            if (!outputDir.exists()) {
+                outputDir.mkdirs()
+            }
+
+            val outputPath = "${outputDir.absolutePath}/cover.jpg"
+
+            // 使用 thumbnail 滤镜智能选择最相关的帧
+            val command = "-y -i \"$filePath\" -vf \"thumbnail=100,scale=${targetW}:${targetH}:force_original_aspect_ratio=decrease,setsar=1\" -frames:v 1 -update 1 \"$outputPath\""
+
+            Log.d("leiting", "VideoThumbnailDataFetcher: FFmpeg thumbnail 命令: $command")
+            val session = FFmpegKit.execute(command)
+
+            if (ReturnCode.isSuccess(session.returnCode)) {
+                val outputFile = File(outputPath)
+                if (outputFile.exists() && outputFile.length() > 0) {
+                    val options = BitmapFactory.Options().apply {
+                        inPreferredConfig = Bitmap.Config.RGB_565
+                    }
+                    val bitmap = BitmapFactory.decodeFile(outputPath, options)
+                    outputDir.deleteRecursively()
+
+                    if (bitmap != null) {
+                        Log.d("leiting", "VideoThumbnailDataFetcher: FFmpeg thumbnail 提取成功: ${bitmap.width}x${bitmap.height}")
+                    }
+                    bitmap
+                } else {
+                    Log.w("leiting", "VideoThumbnailDataFetcher: FFmpeg thumbnail 输出文件不存在或为空")
+                    outputDir.deleteRecursively()
+                    null
+                }
+            } else {
+                Log.w("leiting", "VideoThumbnailDataFetcher: FFmpeg thumbnail 执行失败: ${session.returnCode}")
+                outputDir.deleteRecursively()
+                null
+            }
+        } catch (e: Exception) {
+            Log.e("leiting", "VideoThumbnailDataFetcher: FFmpeg thumbnail 提取异常", e)
+            null
+        }
+    }
+
     private fun extractNonBlackFrame(retriever: MediaMetadataRetriever, time: Long): Bitmap? {
         val offsets = mutableListOf<Long>()
         if (time > 0) offsets.add(time * 1000)
@@ -108,7 +220,7 @@ class VideoThumbnailDataFetcher(
             val frame = retriever.getFrameAtTime(offset, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
             if (frame != null && !isMostlyBlack(frame) && !isMostlyWhite(frame)) return frame
         }
-        return retriever.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+        return retriever.getFrameAtTime(20_000_000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
     }
 
     private fun isMostlyBlack(bitmap: Bitmap): Boolean {
