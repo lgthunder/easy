@@ -12,6 +12,7 @@ import kotlin.math.ceil
 import kotlin.math.sqrt
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.bumptech.glide.Glide
@@ -69,7 +70,12 @@ class FloatingWindowManager(
         val window = FloatingWindowView(context)
         window.setTitle(file.name)
 
-        val player = ExoPlayer.Builder(context).build()
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(5000, 10000, 2500, 5000)
+            .build()
+        val player = ExoPlayer.Builder(context)
+            .setLoadControl(loadControl)
+            .build()
         players.add(player)
         val playerView = LayoutInflater.from(context)
             .inflate(R.layout.view_video_player, null, false) as PlayerView
