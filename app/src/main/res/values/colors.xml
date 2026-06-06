@@ -15,4 +15,25 @@
     <!-- 主Tab按钮文字颜色 -->
     <color name="color_main_tab_text_selected">#03B5AD</color>
     <color name="color_main_tab_text_normal">#666666</color>
+    <color name="color_common_bg_bottom">#F6F6F6</color>
+
+    <color name="color_common_like">#FFC300</color>
+    <!--    错误色-->
+    <color name="color_common_error">#F14242</color>
+    <!--    文字重色-->
+    <color name="color_common_text_high">#333333</color>
+    <!--    文字中色-->
+    <color name="color_common_text_medium">#666666</color>
+    <!--    文字浅色-->
+    <color name="color_common_text_low">#999999</color>
+    <!--    表格文字默认色-->
+    <color name="color_common_table_text">#CCCCCC</color>
+    <!--    待命名-->
+    <color name="color_common_text_bbbbbb">#BBBBBB</color>
+    <!--    通用分割线颜色-->
+    <color name="color_common_divider">#EEEEEE</color>
+    <color name="color_common_divider_sub">#66FFFFFF</color>
+    <color name="color_333333">#333333</color>
+    <color name="color_999999">#999999</color>
 </resources>
+

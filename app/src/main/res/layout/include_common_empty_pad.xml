@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/empty_view"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_gravity="center_horizontal"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:visibility="visible"
+    tools:visibility="visible">
+
+    <ImageView
+        android:id="@+id/empty_img"
+        android:layout_width="@dimen/dp_128"
+        android:layout_height="@dimen/dp_128"
+        android:src="@drawable/common_bg_empty" />
+
+    <TextView
+        android:id="@+id/empty_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="@dimen/dp_4"
+        android:text="还没有内容哦～"
+        android:textColor="@color/color_999999"
+        android:textSize="20sp" />
+</LinearLayout>

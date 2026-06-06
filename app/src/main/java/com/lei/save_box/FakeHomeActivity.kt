@@ -16,6 +16,9 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import com.lei.save_box.databinding.ActivityFakeHomeBinding
 import com.lei.save_box.manager.BiometricHelper
@@ -42,9 +45,11 @@ class FakeHomeActivity : AppCompatActivity() {
         setContentView(binding.root)
         settingsManager = SettingsManager(this)
 
+        setupImmersiveStatusBar()
+
         handleShareIntent(intent)
 
-        binding.rootLayout.setOnClickListener {
+        binding.emptyLayout.root.setOnClickListener {
             val now = System.currentTimeMillis()
             if (now - lastClickTime > 2000) {
                 clickCount = 0
@@ -86,6 +91,28 @@ class FakeHomeActivity : AppCompatActivity() {
 
 
 
+    }
+
+    private fun setupImmersiveStatusBar() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+
+        val windowInsetsController = ViewCompat.getWindowInsetsController(window.decorView)
+        windowInsetsController?.isAppearanceLightStatusBars = true
+
+        window.statusBarColor = android.graphics.Color.TRANSPARENT
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
+
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, insets ->
+            val statusBars = insets.getInsets(WindowInsetsCompat.Type.statusBars())
+            val navigationBars = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
+            view.setPadding(
+                view.paddingLeft,
+                statusBars.top,
+                view.paddingRight,
+                navigationBars.bottom
+            )
+            WindowInsetsCompat.CONSUMED
+        }
     }
 
     fun getVersionName(context: Context): String? {
