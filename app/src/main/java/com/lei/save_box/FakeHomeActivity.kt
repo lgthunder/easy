@@ -60,7 +60,9 @@ class FakeHomeActivity : AppCompatActivity() {
             if (clickCount >= requiredClicks) {
                 clickCount = 0
                 if (settingsManager.isBiometricEnabled) {
-                    authenticateAndEnter()
+                    authenticateAndEnter{
+                        enterVault()
+                    }
                 } else {
                     enterVault()
                 }
@@ -167,42 +169,53 @@ class FakeHomeActivity : AppCompatActivity() {
 
         if (uris.isEmpty()) return
 
-        val fileManager = FileManager(this)
-        val helper = ProgressDialogHelper(this)
-        val total = uris.size
-        val mainHandler = Handler(Looper.getMainLooper())
+        var func = {
+            val fileManager = FileManager(this)
+            val helper = ProgressDialogHelper(this)
+            val total = uris.size
+            val mainHandler = Handler(Looper.getMainLooper())
 
-        lifecycleScope.launch(Dispatchers.IO) {
-            withContext(Dispatchers.Main) {
-                helper.show(getString(R.string.processing_share), 100)
-            }
-            var successCount = 0
-            for (uri in uris) {
+            lifecycleScope.launch(Dispatchers.IO) {
                 withContext(Dispatchers.Main) {
-                    helper.updateProgress(0, "$successCount / $total")
+                    helper.show(getString(R.string.processing_share), 100)
                 }
-                val ok = fileManager.copyToVault(uri) { progress ->
-                    mainHandler.post {
-                        helper.updateProgress(progress, "$successCount / $total")
+                var successCount = 0
+                for (uri in uris) {
+                    withContext(Dispatchers.Main) {
+                        helper.updateProgress(0, "$successCount / $total")
+                    }
+                    val ok = fileManager.copyToVault(uri) { progress ->
+                        mainHandler.post {
+                            helper.updateProgress(progress, "$successCount / $total")
+                        }
+                    }
+                    if (ok) successCount++
+                    withContext(Dispatchers.Main) {
+                        helper.updateProgress(100, "$successCount / $total")
                     }
                 }
-                if (ok) successCount++
                 withContext(Dispatchers.Main) {
-                    helper.updateProgress(100, "$successCount / $total")
-                }
-            }
-            withContext(Dispatchers.Main) {
-                helper.dismiss()
-                if (successCount > 0) {
-                    Toast.makeText(this@FakeHomeActivity, getString(R.string.share_import_success, successCount), Toast.LENGTH_SHORT).show()
+                    helper.dismiss()
+                    if (successCount > 0) {
+                        Toast.makeText(this@FakeHomeActivity, getString(R.string.share_import_success, successCount), Toast.LENGTH_SHORT).show()
+                    }
                 }
             }
         }
+        if (settingsManager.isBiometricEnabled) {
+            authenticateAndEnter{
+                func.invoke()
+            }
+        } else {
+            func.invoke()
+        }
+
+
     }
 
-    private fun authenticateAndEnter() {
+    private fun authenticateAndEnter(runnable: Runnable) {
         if (!BiometricHelper.canAuthenticate(this)) {
-            Toast.makeText(this, R.string.biometric_not_available, Toast.LENGTH_LONG).show()
+//            Toast.makeText(this, R.string.biometric_not_available, Toast.LENGTH_LONG).show()
             return
         }
 
@@ -211,17 +224,18 @@ class FakeHomeActivity : AppCompatActivity() {
             object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                     super.onAuthenticationSucceeded(result)
-                    enterVault()
+//                    enterVault()
+                    runnable.run()
                 }
 
                 override fun onAuthenticationFailed() {
                     super.onAuthenticationFailed()
-                    Toast.makeText(this@FakeHomeActivity, R.string.biometric_failed, Toast.LENGTH_SHORT).show()
+//                    Toast.makeText(this@FakeHomeActivity, R.string.biometric_failed, Toast.LENGTH_SHORT).show()
                 }
 
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                     super.onAuthenticationError(errorCode, errString)
-                    Toast.makeText(this@FakeHomeActivity, R.string.biometric_error, Toast.LENGTH_SHORT).show()
+//                    Toast.makeText(this@FakeHomeActivity, R.string.biometric_error, Toast.LENGTH_SHORT).show()
                 }
             })
 
