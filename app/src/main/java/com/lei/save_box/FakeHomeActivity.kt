@@ -8,6 +8,10 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.LayoutInflater
+import android.view.ViewGroup
+import android.widget.RadioGroup
+import android.widget.RelativeLayout
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.biometric.BiometricPrompt
@@ -29,7 +33,7 @@ class FakeHomeActivity : AppCompatActivity() {
     private lateinit var binding: ActivityFakeHomeBinding
     private lateinit var settingsManager: SettingsManager
     private var clickCount = 0
-    private val requiredClicks = 5
+    private val requiredClicks = 8
     private var lastClickTime = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -58,6 +62,30 @@ class FakeHomeActivity : AppCompatActivity() {
             }
         }
         binding.version.text = getVersionName(this)
+
+
+        val mainCourseTab = LayoutInflater.from(this)
+            .inflate(R.layout.view_main_course_tab, null, false) as RelativeLayout
+        mainCourseTab.layoutParams = RadioGroup.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f)
+        binding.mainRadiogroup.addView(mainCourseTab)
+        val mainClassTab = LayoutInflater.from(this).inflate(R.layout.view_main_class_tab, null, false) as RelativeLayout
+        mainClassTab.layoutParams = RadioGroup.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f)
+        binding.mainRadiogroup.addView(mainClassTab)
+
+        val mainNetDIskTab = LayoutInflater.from(this)
+            .inflate(R.layout.view_main_netdisk_tab, null, false) as RelativeLayout
+        mainNetDIskTab.layoutParams = RadioGroup.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f)
+        binding.mainRadiogroup.addView(mainNetDIskTab)
+
+        val mainCourseMeTab = LayoutInflater.from(this)
+            .inflate(R.layout.view_main_me_tab, null, false) as RelativeLayout
+        mainCourseMeTab.layoutParams = RadioGroup.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f)
+
+        binding.mainRadiogroup.addView(mainCourseMeTab)
+        binding.mainRadiogroup.check(mainCourseTab.id)
+
+
+
     }
 
     fun getVersionName(context: Context): String? {

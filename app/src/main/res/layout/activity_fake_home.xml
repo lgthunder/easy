@@ -3,17 +3,27 @@
     android:id="@+id/rootLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/white"
+    android:background="#F5F6FA"
     android:clickable="true"
     android:focusable="true">
     <TextView
         android:layout_marginBottom="20dp"
-        android:layout_gravity="bottom|center"
+        android:layout_gravity="top|center"
         android:textColor="@color/black"
         android:textSize="15sp"
         android:text="1.1.0"
         android:id="@+id/version"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"></TextView>
+
+    <RadioGroup
+        android:id="@+id/main_radiogroup"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:background="@color/white"
+        android:layout_gravity="bottom"
+        android:orientation="horizontal">
+
+    </RadioGroup>
 
 </FrameLayout>

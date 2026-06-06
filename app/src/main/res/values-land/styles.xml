@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 主Tab按钮样式（横屏） -->
+    <style name="radiobutton_style">
+        <item name="android:layout_width">@dimen/dp_48</item>
+        <item name="android:layout_gravity">center</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:button">@null</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textSize">@dimen/sp_14</item>
+        <item name="android:drawablePadding">@dimen/dp_3</item>
+        <item name="android:layout_centerInParent">true</item>
+        <item name="android:textColor">@drawable/radiobutton_textcloor</item>
+        <item name="android:background">@null</item>
+    </style>
+</resources>

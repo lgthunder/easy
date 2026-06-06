@@ -17,7 +17,7 @@
         <activity
             android:name=".FakeHomeActivity"
             android:exported="true"
-            android:theme="@style/Theme.Save_box">
+            android:theme="@style/Theme.Save_box.NoActionBar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

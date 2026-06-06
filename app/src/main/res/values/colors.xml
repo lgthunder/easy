@@ -7,4 +7,12 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- 主Tab按钮图标颜色 -->
+    <color name="color_main_tab_icon_selected">#03B5AD</color>
+    <color name="color_main_tab_icon_normal">#666666</color>
+
+    <!-- 主Tab按钮文字颜色 -->
+    <color name="color_main_tab_text_selected">#03B5AD</color>
+    <color name="color_main_tab_text_normal">#666666</color>
 </resources>
