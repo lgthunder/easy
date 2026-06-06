@@ -175,6 +175,7 @@ class BackgroundTaskManager private constructor(private val app: Application) {
 
             val trackCount = extractor.trackCount
             val muxerTrackIndices = IntArray(trackCount) { -1 }
+            val firstSamplePerTrack = BooleanArray(trackCount) { true }
             var sampleBuffer = ByteBuffer.allocate(2 * 1024 * 1024)
             val bufferInfo = MediaCodec.BufferInfo()
             val totalDurationUs = endUs - startUs
@@ -202,7 +203,6 @@ class BackgroundTaskManager private constructor(private val app: Application) {
             }
 
             var lastProgress = -1
-            var firstSample = true
             val taskId = task.id
             while (!cancelFlag.get()) {
                 val sampleTime = extractor.sampleTime
@@ -217,7 +217,7 @@ class BackgroundTaskManager private constructor(private val app: Application) {
                         sampleSize = extractor.readSampleData(sampleBuffer, 0)
                     }
                     if (sampleSize >= 0) {
-                        val pts = if (firstSample) 0L else (sampleTime - startUs).coerceAtLeast(0)
+                        val pts = if (firstSamplePerTrack[trackIndex]) 0L else (sampleTime - startUs).coerceAtLeast(0)
                         bufferInfo.apply {
                             offset = 0
                             size = sampleSize
@@ -229,7 +229,7 @@ class BackgroundTaskManager private constructor(private val app: Application) {
                 }
 
                 if (sampleTime >= startUs) {
-                    firstSample = false
+                    firstSamplePerTrack[trackIndex] = false
                     val progress = ((sampleTime - startUs).toFloat() / totalDurationUs * 100).toInt().coerceIn(0, 99)
                     if (progress != lastProgress) {
                         lastProgress = progress

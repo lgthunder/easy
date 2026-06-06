@@ -96,6 +96,7 @@ class VideoEditActivity : AppCompatActivity() {
         p.prepare()
         p.playWhenReady = false
         p.repeatMode = Player.REPEAT_MODE_OFF
+        p.volume = 0f
 
         p.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
