@@ -95,4 +95,6 @@
     <string name="str_cloud">云盘</string>
     <string name="str_mine">我的</string>
     <string name="str_study">学习</string>
+    <string name="share">分享</string>
+    <string name="share_file">分享文件</string>
 </resources>

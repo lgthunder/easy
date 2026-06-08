@@ -219,6 +219,7 @@ class VaultActivity : AppCompatActivity(), LockableActivity {
             items.add(getString(R.string.delete_selected))
         }
         items.add(getString(R.string.multi_select))
+        items.add(getString(R.string.share))
 
         AlertDialog.Builder(this)
             .setTitle(item.name)
@@ -237,6 +238,9 @@ class VaultActivity : AppCompatActivity(), LockableActivity {
                         if (position >= 0) {
                             adapter.enterSelectionMode(position)
                         }
+                    }
+                    getString(R.string.share) -> {
+                        shareFile(item)
                     }
                 }
             }
@@ -621,6 +625,32 @@ class VaultActivity : AppCompatActivity(), LockableActivity {
             floatingWindowManager.openVideo(item.path)
         } else {
             openFileExternally(item)
+        }
+    }
+
+    private fun shareFile(item: FileItem) {
+        val file = File(item.path)
+        if (!file.exists()) {
+            Toast.makeText(this, "文件不存在", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        try {
+            val uri = FileProvider.getUriForFile(
+                this,
+                "${packageName}.fileprovider",
+                file
+            )
+            val mimeType = fileManager.getMimeType(file)
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = mimeType
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            val chooser = Intent.createChooser(intent, getString(R.string.share_file))
+            startActivity(chooser)
+        } catch (e: Exception) {
+            Toast.makeText(this, "无法分享文件: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
