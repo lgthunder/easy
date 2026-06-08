@@ -68,7 +68,8 @@ class BackgroundTaskManager private constructor(private val app: Application) {
         sourcePath: String,
         startMs: Long,
         endMs: Long,
-        sourceName: String
+        sourceName: String,
+        includeAudio: Boolean = false
     ): BackgroundTask {
         val outputDir = File(app.filesDir, "vault")
         if (!outputDir.exists()) outputDir.mkdirs()
@@ -80,7 +81,8 @@ class BackgroundTaskManager private constructor(private val app: Application) {
             startMs = startMs,
             endMs = endMs,
             sourceName = sourceName,
-            status = TaskStatus.PENDING
+            status = TaskStatus.PENDING,
+            includeAudio = includeAudio
         )
         _tasks.add(0, task)
         storage.saveTask(task)
@@ -137,7 +139,7 @@ class BackgroundTaskManager private constructor(private val app: Application) {
                 notifyChanged()
 
                 try {
-                    executeTrim(processing, cancelFlag)
+                    executeTrim(processing, cancelFlag, processing.includeAudio)
                     if (cancelFlag.get()) {
                         val cancelled = processing.copy(status = TaskStatus.CANCELLED, completedAt = System.currentTimeMillis())
                         _tasks[_tasks.indexOfFirst { it.id == task.id }] = cancelled
@@ -159,7 +161,7 @@ class BackgroundTaskManager private constructor(private val app: Application) {
         }
     }
 
-    private fun executeTrim(task: BackgroundTask, cancelFlag: AtomicBoolean) {
+    private fun executeTrim(task: BackgroundTask, cancelFlag: AtomicBoolean, includeAudio: Boolean = false) {
         val sourceFile = File(task.sourcePath)
         val outputFile = File(task.outputPath)
         val startUs = task.startMs * 1000L
@@ -167,19 +169,12 @@ class BackgroundTaskManager private constructor(private val app: Application) {
 
         android.util.Log.d("VideoTrim", "========== Start ==========")
         android.util.Log.d("VideoTrim", "Source: ${sourceFile.name}")
+        android.util.Log.d("VideoTrim", "Include audio: $includeAudio")
         android.util.Log.d("VideoTrim", "Start: ${task.startMs}ms, End: ${task.endMs}ms")
         android.util.Log.d("VideoTrim", "Duration: ${(endUs - startUs)/1000}ms")
 
         val extractor = MediaExtractor()
         var muxer: MediaMuxer? = null
-
-        data class FrameData(
-            val trackIndex: Int,
-            val sampleTime: Long,
-            val data: ByteArray,
-            val flags: Int,
-            val isKeyFrame: Boolean
-        )
 
         try {
             extractor.setDataSource(sourceFile.absolutePath)
@@ -189,48 +184,46 @@ class BackgroundTaskManager private constructor(private val app: Application) {
 
             val trackCount = extractor.trackCount
             val muxerTrackIndices = IntArray(trackCount) { -1 }
+            val firstSamplePerTrack = LongArray(trackCount) { -1L }
             var sampleBuffer = ByteBuffer.allocate(2 * 1024 * 1024)
             val bufferInfo = MediaCodec.BufferInfo()
             val totalDurationUs = endUs - startUs
 
-            val allFrames = mutableListOf<FrameData>()
-            var videoTrackIdx = -1
+            var videoTrackIndex = -1
 
             for (i in 0 until trackCount) {
                 val format = extractor.getTrackFormat(i)
                 val mime = format.getString(MediaFormat.KEY_MIME) ?: continue
                 if (mime.startsWith("video/")) {
                     muxerTrackIndices[i] = muxer.addTrack(format)
+                    videoTrackIndex = i
                     extractor.selectTrack(i)
-                    videoTrackIdx = i
                     android.util.Log.d("VideoTrim", "Track $i: $mime (video)")
-                } else if (mime.startsWith("audio/")) {
-                    android.util.Log.d("VideoTrim", "Track $i: $mime (audio skipped)")
+                } else if (mime.startsWith("audio/") && includeAudio) {
+                    muxerTrackIndices[i] = muxer.addTrack(format)
+                    extractor.selectTrack(i)
+                    android.util.Log.d("VideoTrim", "Track $i: $mime (audio)")
                 }
             }
 
             if (muxerTrackIndices.all { it < 0 }) {
-                throw RuntimeException("No video or audio tracks found")
+                throw RuntimeException("No video tracks found")
             }
 
             muxer.start()
 
-            if (videoTrackIdx >= 0) {
+            if (videoTrackIndex != -1) {
                 extractor.seekTo(startUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
-                android.util.Log.d("VideoTrim", "Seek to ${startUs/1000}ms")
             }
 
             var lastProgress = -1
             val taskId = task.id
             while (!cancelFlag.get()) {
                 val sampleTime = extractor.sampleTime
-                if (sampleTime < 0) break
-                if (sampleTime >= endUs) break
+                if (sampleTime < 0 || sampleTime >= endUs) break
 
                 val trackIndex = extractor.sampleTrackIndex
-
-                // 只处理视频轨道
-                if (trackIndex == videoTrackIdx && muxerTrackIndices[trackIndex] >= 0) {
+                if (muxerTrackIndices[trackIndex] >= 0) {
                     sampleBuffer.clear()
                     var sampleSize = extractor.readSampleData(sampleBuffer, 0)
                     if (sampleSize < 0) {
@@ -238,15 +231,20 @@ class BackgroundTaskManager private constructor(private val app: Application) {
                         sampleSize = extractor.readSampleData(sampleBuffer, 0)
                     }
                     if (sampleSize >= 0) {
-                        val flags = extractor.sampleFlags
-                        val isKeyFrame = (flags and MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0
-                        allFrames.add(FrameData(
-                            trackIndex = trackIndex,
-                            sampleTime = sampleTime,
-                            data = sampleBuffer.array().copyOf(sampleSize),
-                            flags = flags,
-                            isKeyFrame = isKeyFrame
-                        ))
+                        val pts: Long
+                        if (firstSamplePerTrack[trackIndex] < 0) {
+                            firstSamplePerTrack[trackIndex] = sampleTime
+                            pts = 0L
+                        } else {
+                            pts = sampleTime - firstSamplePerTrack[trackIndex]
+                        }
+                        bufferInfo.apply {
+                            offset = 0
+                            size = sampleSize
+                            presentationTimeUs = pts
+                            flags = extractor.sampleFlags
+                        }
+                        muxer.writeSampleData(muxerTrackIndices[trackIndex], sampleBuffer, bufferInfo)
                     }
                 }
 
@@ -264,53 +262,8 @@ class BackgroundTaskManager private constructor(private val app: Application) {
 
                 if (!extractor.advance()) break
             }
-
-            // 找到第一个关键帧的时间
-            val firstKeyFrameTime = allFrames.firstOrNull { it.isKeyFrame }?.sampleTime ?: 0L
-            android.util.Log.d("VideoTrim", "First key frame at: ${firstKeyFrameTime/1000}ms")
-            
-            // 保持编码顺序，使用递增的PTS（基于帧的显示时间排序后的顺序）
-            // 先收集所有帧的显示时间，然后为每个帧分配正确的PTS
-            val sortedFramesByTime = allFrames.sortedBy { it.sampleTime }
-            
-            // 创建显示时间到PTS的映射
-            val timeToPts = mutableMapOf<Long, Long>()
-            var ptsCounter = 0L
-            var lastDisplayTime = -1L
-            for (frame in sortedFramesByTime) {
-                if (lastDisplayTime < 0) {
-                    timeToPts[frame.sampleTime] = 0L
-                } else {
-                    ptsCounter += frame.sampleTime - lastDisplayTime
-                    timeToPts[frame.sampleTime] = ptsCounter
-                }
-                lastDisplayTime = frame.sampleTime
-            }
-            
-            // 按编码顺序写入，但使用排序后的PTS
-            var frameCount = 0
-            for (frame in allFrames) {
-                val pts = timeToPts[frame.sampleTime] ?: ptsCounter
-                
-                if (frameCount < 30) {
-                    android.util.Log.d("VideoTrim", "Frame[$frameCount]: time=${frame.sampleTime/1000}ms, pts=${pts/1000}ms, key=${frame.isKeyFrame}")
-                }
-                
-                bufferInfo.apply {
-                    offset = 0
-                    size = frame.data.size
-                    presentationTimeUs = pts
-                    flags = frame.flags
-                }
-                muxer?.writeSampleData(muxerTrackIndices[frame.trackIndex], ByteBuffer.wrap(frame.data), bufferInfo)
-                frameCount++
-            }
-            
-            android.util.Log.d("VideoTrim", "Total video frames: $frameCount")
         } finally {
-            try { muxer?.stop() } catch (e: Exception) { 
-                android.util.Log.e("VideoTrim", "Muxer stop error: ${e.message}")
-            }
+            try { muxer?.stop() } catch (_: Exception) {}
             try { muxer?.release() } catch (_: Exception) {}
             try { extractor.release() } catch (_: Exception) {}
         }

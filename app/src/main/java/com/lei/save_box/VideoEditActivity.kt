@@ -359,6 +359,7 @@ class VideoEditActivity : AppCompatActivity() {
     private fun saveTrimmedVideo() {
         val startMs = binding.trimRangeView.startMs
         val endMs = binding.trimRangeView.endMs
+        val includeAudio = binding.cbIncludeAudio.isChecked
         if (endMs - startMs < 100) {
             Toast.makeText(this, "裁剪范围太小", Toast.LENGTH_SHORT).show()
             return
@@ -370,7 +371,7 @@ class VideoEditActivity : AppCompatActivity() {
         val sourceFile = File(sourcePath)
         val sourceName = sourceFile.nameWithoutExtension
 
-        BackgroundTaskManager.getInstance().addTask(sourcePath, startMs, endMs, sourceName)
+        BackgroundTaskManager.getInstance().addTask(sourcePath, startMs, endMs, sourceName, includeAudio)
 
         Toast.makeText(this, "已添加到后台任务", Toast.LENGTH_SHORT).show()
     }

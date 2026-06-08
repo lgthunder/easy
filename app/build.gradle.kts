@@ -31,8 +31,8 @@ android {
         applicationId = "com.lei.save_box"
         minSdk = 30
         targetSdk = 34
-        versionCode = 100202
-        versionName = "1.2.2"
+        versionCode = 100203
+        versionName = "1.2.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

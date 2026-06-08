@@ -21,5 +21,6 @@ data class BackgroundTask(
     val progress: Int = 0,
     val createdAt: Long = System.currentTimeMillis(),
     val completedAt: Long = 0,
-    val errorMessage: String = ""
+    val errorMessage: String = "",
+    val includeAudio: Boolean = false
 )
