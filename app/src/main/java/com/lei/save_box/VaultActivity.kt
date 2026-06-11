@@ -172,8 +172,7 @@ class VaultActivity : AppCompatActivity(), LockableActivity {
     }
 
     private fun setupFabs() {
-        binding.fabImport.setOnClickListener { showImportDialog() }
-        binding.fabMenu.setOnClickListener { showMenuDialog() }
+        binding.fabImport.setOnClickListener { showCombinedMenu() }
         binding.fabDelete.setOnClickListener { deleteSelectedFiles() }
         binding.fabRename.setOnClickListener { renameSelectedFile() }
         binding.fabMove.setOnClickListener { moveSelectedFiles() }
@@ -184,7 +183,6 @@ class VaultActivity : AppCompatActivity(), LockableActivity {
             binding.chipSelectionCount.visibility = View.VISIBLE
             binding.chipSelectionCount.text = getString(R.string.selected_count, count)
             binding.fabImport.visibility = View.GONE
-            binding.fabMenu.visibility = View.GONE
 
             if (count == 1) {
                 binding.fabRename.visibility = View.VISIBLE
@@ -196,7 +194,6 @@ class VaultActivity : AppCompatActivity(), LockableActivity {
         } else {
             binding.chipSelectionCount.visibility = View.GONE
             binding.fabImport.visibility = View.VISIBLE
-            binding.fabMenu.visibility = View.VISIBLE
             binding.fabRename.visibility = View.GONE
             binding.fabMove.visibility = View.GONE
             binding.fabDelete.visibility = View.GONE
@@ -335,8 +332,10 @@ class VaultActivity : AppCompatActivity(), LockableActivity {
             .show()
     }
 
-    private fun showMenuDialog() {
+    private fun showCombinedMenu() {
         val items = arrayOf(
+            getString(R.string.import_from_album),
+            getString(R.string.import_from_file),
             getString(R.string.new_folder),
             getString(R.string.trash),
             getString(R.string.backup_export),
@@ -357,21 +356,23 @@ class VaultActivity : AppCompatActivity(), LockableActivity {
             .setTitle(R.string.menu)
             .setItems(items) { _, which ->
                 when (which) {
-                    0 -> showCreateFolderDialog()
-                    1 -> openTrash()
-                    2 -> showExportPasswordDialog()
-                    3 -> openBackupImport()
-                    4 -> toggleSort(SortMode.NAME_ASC, SortMode.NAME_DESC)
-                    5 -> toggleSort(SortMode.DATE_ASC, SortMode.DATE_DESC)
-                    6 -> toggleSort(SortMode.SIZE_ASC, SortMode.SIZE_DESC)
-                    7 -> toggleSort(SortMode.TYPE_ASC, SortMode.TYPE_DESC)
-                    8 -> floatingWindowManager.tileHorizontal()
-                    9 -> floatingWindowManager.tileVertical()
-                    10 -> floatingWindowManager.tileGrid()
-                    11 -> showSettingsDialog()
-                    12 -> clearGlideCache()
-                    13 -> viewFFmpegLog()
-                    14 -> showExitDialog()
+                    0 -> openImagePicker()
+                    1 -> openFilePicker()
+                    2 -> showCreateFolderDialog()
+                    3 -> openTrash()
+                    4 -> showExportPasswordDialog()
+                    5 -> openBackupImport()
+                    6 -> toggleSort(SortMode.NAME_ASC, SortMode.NAME_DESC)
+                    7 -> toggleSort(SortMode.DATE_ASC, SortMode.DATE_DESC)
+                    8 -> toggleSort(SortMode.SIZE_ASC, SortMode.SIZE_DESC)
+                    9 -> toggleSort(SortMode.TYPE_ASC, SortMode.TYPE_DESC)
+                    10 -> floatingWindowManager.tileHorizontal()
+                    11 -> floatingWindowManager.tileVertical()
+                    12 -> floatingWindowManager.tileGrid()
+                    13 -> showSettingsDialog()
+                    14 -> clearGlideCache()
+                    15 -> viewFFmpegLog()
+                    16 -> showExitDialog()
                 }
             }
             .show()

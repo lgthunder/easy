@@ -71,7 +71,7 @@ class TaskFloatingWindow(private val context: Context) {
             FrameLayout.LayoutParams.WRAP_CONTENT,
             FrameLayout.LayoutParams.WRAP_CONTENT
         ).apply {
-            gravity = Gravity.BOTTOM or Gravity.CENTER
+            gravity = Gravity.RIGHT or Gravity.CENTER
             bottomMargin = 20
         }
         container.addView(rootView, lp)

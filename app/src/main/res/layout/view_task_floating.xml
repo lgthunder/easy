@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/rootLayout"
-    android:background="#803a4afa"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content">
 
@@ -49,8 +48,8 @@
 
     <FrameLayout
         android:id="@+id/badgeContainer"
-        android:layout_width="56dp"
-        android:layout_height="56dp"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
         android:layout_gravity="end"
         android:background="@drawable/bg_floating_menu">
 
@@ -60,8 +59,8 @@
             android:layout_height="match_parent"
             android:gravity="center"
             android:text="1"
-            android:textColor="#3e3e3e"
-            android:textSize="25sp"
+            android:textColor="#70ffffff"
+            android:textSize="20sp"
             android:textStyle="bold" />
 
     </FrameLayout>

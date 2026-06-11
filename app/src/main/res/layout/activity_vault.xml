@@ -62,17 +62,6 @@
         app:chipBackgroundColor="#E3404040"
         android:textColor="@android:color/white" />
 
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/fabMenu"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="top|end"
-        android:layout_marginTop="60dp"
-        android:layout_marginEnd="16dp"
-        android:contentDescription="@string/menu"
-        android:src="@android:drawable/ic_menu_more"
-        app:tint="@android:color/white"
-        app:fabSize="mini" />
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fabRename"
@@ -113,16 +102,6 @@
         android:visibility="gone"
         app:tint="@android:color/white" />
 
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/fabImport"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom|start"
-        android:layout_margin="16dp"
-        android:contentDescription="@string/import_file"
-        android:src="@android:drawable/ic_menu_add"
-        app:tint="@android:color/white" />
-
     <FrameLayout
         android:id="@+id/floatingContainer"
         android:layout_width="match_parent"
@@ -133,6 +112,20 @@
         android:id="@+id/floatTask"
         android:clipChildren="false"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent" >
+
+        <ImageButton
+            android:id="@+id/fabImport"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_gravity="bottom|end"
+            android:layout_margin="16dp"
+            android:background="@drawable/bg_floating_menu"
+            android:contentDescription="@string/import_file"
+            android:scaleType="center"
+            android:src="@drawable/ic_add"
+            app:tint="#70ffffff" />
+
+    </FrameLayout>
 
 </FrameLayout>
