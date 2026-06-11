@@ -123,9 +123,9 @@ class VideoEditActivity : AppCompatActivity() {
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 if (isPlaying) {
-                    binding.btnPlayPause.setImageResource(android.R.drawable.ic_media_pause)
+                    binding.btnPlayPause.setImageResource(R.drawable.ic_playback_pause)
                 } else {
-                    binding.btnPlayPause.setImageResource(android.R.drawable.ic_media_play)
+                    binding.btnPlayPause.setImageResource(R.drawable.ic_playback_play)
                 }
                 binding.trimRangeView.currentPositionMs = p.currentPosition
             }

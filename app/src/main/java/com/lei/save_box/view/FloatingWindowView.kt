@@ -205,7 +205,7 @@ class FloatingWindowView @JvmOverloads constructor(
         y = 0f
         requestLayout()
 
-        binding.btnFullscreen.setImageResource(android.R.drawable.ic_menu_revert)
+        binding.btnFullscreen.setImageResource(R.drawable.ic_playback_fullscreen_exit)
         binding.btnFullscreen.contentDescription = context.getString(R.string.exit_fullscreen)
         isFullscreen = true
     }
@@ -215,7 +215,7 @@ class FloatingWindowView @JvmOverloads constructor(
         x = savedX
         y = savedY
 
-        binding.btnFullscreen.setImageResource(android.R.drawable.ic_menu_crop)
+        binding.btnFullscreen.setImageResource(R.drawable.ic_playback_fullscreen)
         binding.btnFullscreen.contentDescription = context.getString(R.string.fullscreen)
         isFullscreen = false
     }
@@ -251,8 +251,8 @@ class FloatingWindowView @JvmOverloads constructor(
 
     fun setMuted(muted: Boolean) {
         binding.btnMute.setImageResource(
-            if (muted) android.R.drawable.ic_lock_silent_mode_off
-            else android.R.drawable.ic_lock_silent_mode
+            if (muted) R.drawable.ic_playback_volume_off
+            else R.drawable.ic_playback_volume_on
         )
         binding.btnMute.contentDescription = context.getString(
             if (muted) R.string.unmute else R.string.mute

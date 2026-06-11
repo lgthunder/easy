@@ -39,7 +39,7 @@
             android:layout_height="28dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/mute"
-            android:src="@android:drawable/ic_lock_silent_mode"
+            android:src="@drawable/ic_playback_volume_on"
             android:visibility="gone" />
 
         <ImageButton
@@ -48,7 +48,7 @@
             android:layout_height="28dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/video_edit"
-            android:src="@android:drawable/ic_menu_edit"
+            android:src="@drawable/ic_playback_edit"
             android:visibility="gone" />
 
         <ImageButton
@@ -57,7 +57,7 @@
             android:layout_height="28dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/minimize"
-            android:src="@android:drawable/ic_menu_more" />
+            android:src="@drawable/ic_playback_minimize" />
 
         <ImageButton
             android:id="@+id/btnFullscreen"
@@ -65,7 +65,7 @@
             android:layout_height="28dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/fullscreen"
-            android:src="@android:drawable/ic_menu_crop" />
+            android:src="@drawable/ic_playback_fullscreen" />
 
         <ImageButton
             android:id="@+id/btnClose"
@@ -73,7 +73,7 @@
             android:layout_height="28dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/close"
-            android:src="@android:drawable/ic_menu_close_clear_cancel" />
+            android:src="@drawable/ic_playback_close" />
 
     </LinearLayout>
 

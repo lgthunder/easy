@@ -44,7 +44,7 @@
                     android:layout_height="36dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:contentDescription="Speed"
-                    android:src="@android:drawable/ic_media_ff" />
+                    android:src="@drawable/ic_playback_speed" />
 
                 <TextView
                     android:id="@+id/tvSpeed"
@@ -62,7 +62,7 @@
                 android:layout_marginLeft="10dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/undo"
-                android:src="@android:drawable/ic_menu_revert" />
+                android:src="@drawable/ic_playback_undo" />
 
             <ImageButton
                 android:id="@+id/btnPlayPause"
@@ -71,7 +71,7 @@
                 android:layout_marginHorizontal="10dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/play"
-                android:src="@android:drawable/ic_media_play" />
+                android:src="@drawable/ic_playback_play" />
 
             <ImageButton
                 android:id="@+id/btnSave"
@@ -79,7 +79,7 @@
                 android:layout_height="36dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/trim_save"
-                android:src="@android:drawable/ic_menu_save" />
+                android:src="@drawable/ic_playback_save" />
 
             <LinearLayout
                 android:layout_width="wrap_content"
@@ -93,7 +93,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Audio"
-                    android:textColor="@android:color/white" />
+                    android:textColor="@android:color/white"
+                    android:buttonTint="@color/selector_checkbox_tint" />
             </LinearLayout>
 
             <LinearLayout
@@ -109,7 +110,7 @@
                     android:layout_height="36dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:contentDescription="@string/mute"
-                    android:src="@android:drawable/ic_lock_silent_mode" />
+                    android:src="@drawable/ic_playback_volume_on" />
 
                 <SeekBar
                     android:id="@+id/sbVolume"
