@@ -11,6 +11,7 @@ import android.widget.Toast
 import kotlin.math.ceil
 import kotlin.math.sqrt
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.ui.AspectRatioFrameLayout
@@ -60,7 +61,7 @@ class FloatingWindowManager(
         addWindow(window)
     }
 
-    fun openVideo(filePath: String) {
+    fun openVideo(filePath: String, playlist: List<String> = emptyList(), startIndex: Int = 0) {
         val file = File(filePath)
         if (!file.exists()) {
             Toast.makeText(context, "文件不存在", Toast.LENGTH_SHORT).show()
@@ -86,7 +87,15 @@ class FloatingWindowManager(
             controllerShowTimeoutMs = 3000
             resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
         }
-        player.setMediaItem(MediaItem.fromUri(file.toURI().toString()))
+
+        if (playlist.size > 1) {
+            val mediaItems = playlist.map { path ->
+                MediaItem.fromUri(File(path).toURI().toString())
+            }
+            player.setMediaItems(mediaItems, startIndex, 0L)
+        } else {
+            player.setMediaItem(MediaItem.fromUri(file.toURI().toString()))
+        }
         player.prepare()
         player.playWhenReady = true
         player.volume = 0f
@@ -124,6 +133,18 @@ class FloatingWindowManager(
             val vol = progress / 100f
             player.volume = vol
             window.setMuted(progress == 0)
+        }
+
+        // 播放列表切换时更新标题栏
+        if (playlist.size > 1) {
+            player.addListener(object : Player.Listener {
+                override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                    val currentPath = mediaItem?.localConfiguration?.uri?.path
+                    if (currentPath != null) {
+                        window.setTitle(File(currentPath).name)
+                    }
+                }
+            })
         }
 
         window.setOnCloseListener {

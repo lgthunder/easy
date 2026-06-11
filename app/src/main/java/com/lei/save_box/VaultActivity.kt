@@ -22,6 +22,7 @@ import com.bumptech.glide.Glide
 import com.lei.save_box.adapter.FileAdapter
 import com.lei.save_box.databinding.ActivityVaultBinding
 import com.lei.save_box.glide.FFmpegLogger
+import com.lei.save_box.helper.VideoPlaylistHelper
 import com.lei.save_box.manager.BackgroundTaskManager
 import com.lei.save_box.manager.BackupManager
 import com.lei.save_box.manager.FileManager
@@ -622,7 +623,14 @@ class VaultActivity : AppCompatActivity(), LockableActivity {
         if (item.isImage) {
             floatingWindowManager.openImage(item.path)
         } else if (item.isVideo) {
-            floatingWindowManager.openVideo(item.path)
+            val dir = currentDir ?: fileManager.vaultDir
+            val allVideos = fileManager.listFiles(dir).filter { it.isVideo }
+            val result = VideoPlaylistHelper.findSimilarPlaylist(item, allVideos)
+            if (result != null && result.paths.size > 1) {
+                floatingWindowManager.openVideo(item.path, result.paths, result.startIndex)
+            } else {
+                floatingWindowManager.openVideo(item.path)
+            }
         } else {
             openFileExternally(item)
         }
