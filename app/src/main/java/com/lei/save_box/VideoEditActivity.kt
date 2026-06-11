@@ -73,6 +73,12 @@ class VideoEditActivity : AppCompatActivity() {
         binding = ActivityVideoEditBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        // 隐藏状态栏，全屏沉浸式
+        window.insetsController?.apply {
+            hide(android.view.WindowInsets.Type.statusBars())
+            systemBarsBehavior = android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+
         sourcePath = intent.getStringExtra("video_path") ?: run {
             finish()
             return

@@ -67,6 +67,7 @@
         <activity
             android:name=".VideoEditActivity"
             android:exported="false"
+            android:screenOrientation="landscape"
             android:theme="@style/Theme.Save_box.FullScreen" />
 
         <provider
