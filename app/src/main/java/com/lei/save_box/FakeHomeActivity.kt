@@ -10,6 +10,7 @@ import android.os.Handler
 import android.os.Looper
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import android.widget.CompoundButton
 import android.widget.RadioGroup
 import android.widget.RelativeLayout
 import android.widget.Toast
@@ -49,32 +50,12 @@ class FakeHomeActivity : AppCompatActivity() {
 
         handleShareIntent(intent)
 
-        binding.emptyLayout.root.setOnClickListener {
-            val now = System.currentTimeMillis()
-            if (now - lastClickTime > 2000) {
-                clickCount = 0
-            }
-            lastClickTime = now
-            clickCount++
-
-            if (clickCount >= requiredClicks) {
-                clickCount = 0
-                if (settingsManager.isBiometricEnabled) {
-                    authenticateAndEnter{
-                        enterVault()
-                    }
-                } else {
-                    enterVault()
-                }
-            }
-        }
-        binding.version.text = getVersionName(this)
-
-
+        // 初始化底部 tab
         val mainCourseTab = LayoutInflater.from(this)
             .inflate(R.layout.view_main_course_tab, null, false) as RelativeLayout
         mainCourseTab.layoutParams = RadioGroup.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f)
         binding.mainRadiogroup.addView(mainCourseTab)
+
         val mainClassTab = LayoutInflater.from(this).inflate(R.layout.view_main_class_tab, null, false) as RelativeLayout
         mainClassTab.layoutParams = RadioGroup.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f)
         binding.mainRadiogroup.addView(mainClassTab)
@@ -87,9 +68,52 @@ class FakeHomeActivity : AppCompatActivity() {
         val mainCourseMeTab = LayoutInflater.from(this)
             .inflate(R.layout.view_main_me_tab, null, false) as RelativeLayout
         mainCourseMeTab.layoutParams = RadioGroup.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f)
-
         binding.mainRadiogroup.addView(mainCourseMeTab)
-        binding.mainRadiogroup.check(mainCourseTab.id)
+
+        // 收集所有 tab 容器对应的 RadioButton
+        val tabRadioButtons = listOf(
+            mainCourseTab.findViewById<CompoundButton>(R.id.main_course_tab),
+            mainClassTab.findViewById<CompoundButton>(R.id.main_class_tab),
+            mainNetDIskTab.findViewById<CompoundButton>(R.id.main_cloud_tab),
+            mainCourseMeTab.findViewById<CompoundButton>(R.id.main_mine_tab)
+        )
+
+        // 手动管理 tab 选中互斥
+        fun selectTab(target: CompoundButton) {
+            tabRadioButtons.forEach { it.isChecked = (it == target) }
+        }
+
+        tabRadioButtons[0].setOnClickListener { selectTab(tabRadioButtons[0]) }
+        tabRadioButtons[1].setOnClickListener { selectTab(tabRadioButtons[1]) }
+        tabRadioButtons[2].setOnClickListener { selectTab(tabRadioButtons[2]) }
+        tabRadioButtons[3].setOnClickListener { selectTab(tabRadioButtons[3]) }
+
+        // 默认选中第一个
+        selectTab(tabRadioButtons[0])
+
+        val cloudRadioBtn = tabRadioButtons[2] // 云盘 tab 的 RadioButton
+
+        binding.emptyLayout.root.setOnClickListener {
+            val now = System.currentTimeMillis()
+            if (now - lastClickTime > 2000) {
+                clickCount = 0
+            }
+            lastClickTime = now
+            clickCount++
+
+            if (clickCount >= requiredClicks&&cloudRadioBtn.isChecked) {
+                clickCount = 0
+                // 切到云盘 tab
+                if (settingsManager.isBiometricEnabled) {
+                    authenticateAndEnter{
+                        enterVault()
+                    }
+                } else {
+                    enterVault()
+                }
+            }
+        }
+        binding.version.text = getVersionName(this)
 
 
 
